@@ -4,7 +4,7 @@
 
 **A deterministic editing engine that agents can drive and humans can audit.**
 
-[![ci](https://github.com/{{OWNER}}/cutnow/actions/workflows/ci.yml/badge.svg)](https://github.com/{{OWNER}}/cutnow/actions/workflows/ci.yml)
+[![ci](https://github.com/jchen0102/cutnow/actions/workflows/ci.yml/badge.svg)](https://github.com/jchen0102/cutnow/actions/workflows/ci.yml)
 [![pypi](https://img.shields.io/pypi/v/cutnow.svg)](https://pypi.org/project/cutnow/)
 [![python](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://pypi.org/project/cutnow/)
 [![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
