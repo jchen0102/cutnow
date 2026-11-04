@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vcut"
+version = "0.1.0"
+description = "Deterministic, inspectable video editing for agents: solutions, ops and EDL."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.9"
+authors = [{ name = "vcut contributors" }]
+keywords = ["video", "editing", "ffmpeg", "edl", "agent", "clip"]
+dependencies = ["numpy>=1.22"]
+
+[project.optional-dependencies]
+clip = ["onnxruntime>=1.16", "tokenizers>=0.15"]
+qc = ["opencv-python-headless>=4.8"]
+dev = ["pytest>=7"]
+
+[project.scripts]
+vcut = "vcut:main"
+
+[tool.setuptools]
+py-modules = ["vcut"]
+packages = ["core"]

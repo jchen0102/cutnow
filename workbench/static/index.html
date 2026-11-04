@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<title>vcut 工作台</title>
+<link rel="stylesheet" href="/static/style.css">
+</head><body>
+<header>
+  <div class="brand">vcut<span>工作台</span></div>
+  <div class="meta" id="meta"></div>
+  <div class="actions">
+    <button id="render" class="primary">渲染新版本</button>
+    <span id="job" class="job"></span>
+  </div>
+</header>
+<main>
+  <section class="col shots">
+    <h2>镜头 <small id="shotCount"></small></h2>
+    <div id="shots" class="list"></div>
+    <h2>版本</h2>
+    <div id="versions" class="list versions"></div>
+  </section>
+
+  <section class="col center">
+    <h2>时间线 <small id="tlMeta"></small></h2>
+    <div class="tlwrap"><svg id="tl" preserveAspectRatio="none"></svg></div>
+    <div class="playerwrap">
+      <video id="player" controls playsinline preload="metadata"></video>
+      <div class="empty" id="empty">还没有版本，点右上角渲染</div>
+    </div>
+  </section>
+
+  <section class="col ops">
+    <h2>决策</h2>
+    <div id="inspector" class="inspector hidden"></div>
+    <div id="ops" class="list opslist"></div>
+  </section>
+</main>
+<script src="/static/app.js"></script>
+</body></html>

@@ -1,0 +1,130 @@
+{
+  "id": "film-montage",
+  "name": "电影感卡点混剪",
+  "description": "CC BY 素材 + 鼓点音乐 → 15-20 秒横版卡点片（片尾带署名）",
+  "inputs": {
+    "source": {
+      "type": "video",
+      "required": true,
+      "default": "assets/tos/tos_720p.mov"
+    },
+    "music": {
+      "type": "audio",
+      "required": true,
+      "default": "assets/tos/battle.mp3"
+    }
+  },
+  "output": {
+    "width": 1280,
+    "height": 720,
+    "fps": 30,
+    "container": "mp4"
+  },
+  "output_kind": "mp4",
+  "steps": [
+    {
+      "id": "analyze",
+      "op": "analyze.standard",
+      "params": {
+        "scene_threshold": 0.25,
+        "chorus_window": 30.0
+      }
+    },
+    {
+      "id": "shots",
+      "op": "select.shots",
+      "gate": "confirm",
+      "params": {
+        "shots": [
+          [
+            425.7,
+            4
+          ],
+          [
+            40.35,
+            4
+          ],
+          [
+            441.51,
+            8
+          ],
+          [
+            95.62,
+            8
+          ],
+          [
+            491.88,
+            8
+          ],
+          [
+            383.23,
+            4
+          ],
+          [
+            470.54,
+            8
+          ],
+          [
+            57.17,
+            8
+          ]
+        ]
+      }
+    },
+    {
+      "id": "cards",
+      "op": "card.bookends",
+      "params": {
+        "title": "TEARS OF STEEL",
+        "sub": "a Blender open movie",
+        "end": "CC BY 3.0",
+        "end_sub": "Blender Foundation",
+        "head_dur": 1.6,
+        "tail_dur": 2.2
+      }
+    },
+    {
+      "id": "audio",
+      "op": "audio.chorus",
+      "params": {
+        "in": "auto"
+      }
+    },
+    {
+      "id": "cleanup",
+      "op": "cleanup.crop",
+      "params": {
+        "crop": [
+          1280,
+          534,
+          0,
+          0
+        ],
+        "crop_bottom": 0
+      }
+    },
+    {
+      "id": "normalize",
+      "op": "audio.normalize",
+      "params": {
+        "i": -14.0
+      }
+    },
+    {
+      "id": "render",
+      "op": "render.edl",
+      "params": {
+        "out": "out/tos-montage.mp4"
+      }
+    },
+    {
+      "id": "qc",
+      "op": "qc.report",
+      "params": {}
+    }
+  ],
+  "outputs": [
+    "mp4"
+  ],
+  "capabilities": []
+}

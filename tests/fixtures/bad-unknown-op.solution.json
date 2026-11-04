@@ -1,0 +1,10 @@
+{
+  "id": "bad-demo",
+  "name": "故意写坏的解法",
+  "inputs": { "source": { "type": "video" } },
+  "steps": [
+    { "op": "analyze.standard" },
+    { "op": "evil.rm_rf_home", "params": {} },
+    { "op": "render.edl", "gate": "sudo" }
+  ]
+}

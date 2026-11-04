@@ -1,0 +1,101 @@
+{
+  "id": "sports-highlight",
+  "name": "赛事集锦",
+  "description": "一段比赛素材 + 鼓点音乐 → 12 秒卡点集锦（自动选段）",
+  "inputs": {
+    "source": {
+      "type": "video",
+      "required": true
+    },
+    "music": {
+      "type": "audio",
+      "required": true,
+      "default": "assets/tos/battle.mp3"
+    }
+  },
+  "output": {
+    "width": 1280,
+    "height": 720,
+    "fps": 30,
+    "container": "mp4"
+  },
+  "output_kind": "mp4",
+  "steps": [
+    {
+      "id": "analyze",
+      "op": "analyze.standard",
+      "params": {
+        "features": "auto",
+        "scene_threshold": 0.3,
+        "chorus_window": 30.0
+      }
+    },
+    {
+      "id": "precheck",
+      "op": "qc.source",
+      "params": {
+        "min_sport": 0.2,
+        "strict": true
+      }
+    },
+    {
+      "id": "shots",
+      "op": "select.semantic",
+      "gate": "confirm",
+      "params": {
+        "target_seconds": 12,
+        "min_sem": 0.15,
+        "min_total": 3.0
+      }
+    },
+    {
+      "id": "audio",
+      "op": "audio.chorus",
+      "params": {
+        "in": "auto"
+      }
+    },
+    {
+      "id": "subs",
+      "op": "subtitle.by_beat",
+      "params": {
+        "beats_per_line": 6,
+        "lines": [
+          "SPORTS HIGHLIGHTS",
+          "Footage · Wikimedia CC BY-SA"
+        ]
+      }
+    },
+    {
+      "id": "cleanup",
+      "op": "cleanup.crop",
+      "params": {
+        "crop": "full",
+        "crop_bottom": 0
+      }
+    },
+    {
+      "id": "normalize",
+      "op": "audio.normalize",
+      "params": {
+        "i": -14.0
+      }
+    },
+    {
+      "id": "render",
+      "op": "render.edl",
+      "params": {
+        "out": "out/batch/00.mp4"
+      }
+    },
+    {
+      "id": "qc",
+      "op": "qc.report",
+      "params": {}
+    }
+  ],
+  "outputs": [
+    "mp4"
+  ],
+  "capabilities": []
+}

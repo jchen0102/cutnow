@@ -1,0 +1,121 @@
+{
+  "id": "mj-remake",
+  "name": "热点原片换人",
+  "description": "原片 + 歌 + 角色图 → 卡点重剪（换人回填由外部模型完成）",
+  "inputs": {
+    "source": {
+      "type": "video",
+      "required": true,
+      "default": "assets/src_jam.mp4"
+    },
+    "music": {
+      "type": "audio",
+      "required": true,
+      "default": "assets/beat_it.m4a"
+    }
+  },
+  "output": {
+    "width": 1280,
+    "height": 720,
+    "fps": 30,
+    "container": "mp4"
+  },
+  "steps": [
+    {
+      "id": "analyze",
+      "op": "analyze.standard",
+      "params": {
+        "scene_threshold": 0.2,
+        "chorus_window": 28.0
+      }
+    },
+    {
+      "id": "shots",
+      "op": "select.shots",
+      "gate": "confirm",
+      "params": {
+        "shots": [
+          [
+            16.4,
+            8
+          ],
+          [
+            116.5,
+            8
+          ],
+          [
+            271.0,
+            12
+          ],
+          [
+            367.0,
+            8
+          ],
+          [
+            372.0,
+            4
+          ]
+        ]
+      }
+    },
+    {
+      "id": "audio",
+      "op": "audio.chorus",
+      "params": {
+        "in": "auto"
+      }
+    },
+    {
+      "id": "subs",
+      "op": "subtitle.by_beat",
+      "params": {
+        "beats_per_line": 8,
+        "lines": [
+          "老板说今晚不准提前下班",
+          "任务堆满桌面 做不完接着干",
+          "工资没见涨啊 要求反而更刁难",
+          "继续干 接着干"
+        ]
+      }
+    },
+    {
+      "id": "cleanup",
+      "op": "cleanup.crop",
+      "params": {
+        "crop": [
+          632,
+          408,
+          108,
+          0
+        ],
+        "crop_bottom": 72
+      }
+    },
+    {
+      "id": "normalize",
+      "op": "audio.normalize",
+      "params": {
+        "i": -14.0
+      }
+    },
+    {
+      "id": "render",
+      "op": "render.edl",
+      "params": {
+        "out": "out/mj-s1.mp4"
+      }
+    },
+    {
+      "id": "qc",
+      "op": "qc.report",
+      "params": {}
+    }
+  ],
+  "outputs": [
+    "mp4"
+  ],
+  "capabilities": [
+    "cloud:replace 由外部模型完成，本解法不含"
+  ],
+  "output_kind": "mp4"
+}

@@ -1,0 +1,81 @@
+{
+  "id": "talk-highlight",
+  "name": "口播高光",
+  "description": "长口播 → 15 秒竖版高光，字幕来自语音转写",
+  "inputs": {
+    "source": {
+      "type": "video",
+      "required": true,
+      "default": "assets/talk_src.mp4"
+    }
+  },
+  "output": {
+    "width": 720,
+    "height": 1280,
+    "fps": 30,
+    "container": "mp4"
+  },
+  "steps": [
+    {
+      "id": "analyze",
+      "op": "analyze.media",
+      "params": {
+        "scene_threshold": 0.35
+      }
+    },
+    {
+      "id": "frame",
+      "op": "frame.vertical",
+      "params": {
+        "width": 720,
+        "height": 1280
+      }
+    },
+    {
+      "id": "asr",
+      "op": "transcribe.whisper",
+      "params": {
+        "base": "out/talk/asr_medium",
+        "no_gpu": true
+      }
+    },
+    {
+      "id": "cut",
+      "op": "cut.by_sentence",
+      "gate": "pick",
+      "params": {
+        "target_seconds": 15,
+        "min_chars": 6
+      }
+    },
+    {
+      "id": "audio",
+      "op": "audio.from_clips",
+      "params": {}
+    },
+    {
+      "id": "normalize",
+      "op": "audio.normalize",
+      "params": {
+        "i": -14.0
+      }
+    },
+    {
+      "id": "render",
+      "op": "render.edl",
+      "params": {
+        "out": "out/talk-highlight.mp4"
+      }
+    },
+    {
+      "id": "qc",
+      "op": "qc.report",
+      "params": {}
+    }
+  ],
+  "outputs": [
+    "mp4"
+  ],
+  "capabilities": [],
+  "output_kind": "mp4"
+}
