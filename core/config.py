@@ -4,32 +4,32 @@ import shutil
 import sys
 from pathlib import Path
 
-ROOT = Path(os.environ.get("VCUT_ROOT") or Path(__file__).resolve().parent.parent)
+ROOT = Path(os.environ.get("CUTNOW_ROOT") or os.environ.get("VCUT_ROOT") or Path(__file__).resolve().parent.parent)
 
 # 可选：仓库内的本地依赖目录（开发/离线环境用，等价于 pip install）
 _vendor = ROOT / ".pylibs"
 if _vendor.is_dir() and str(_vendor) not in sys.path:
     sys.path.insert(0, str(_vendor))
 def _cache_root() -> Path:
-    env = os.environ.get("VCUT_CACHE")
+    env = os.environ.get("CUTNOW_CACHE") or os.environ.get("VCUT_CACHE")
     if env:
         return Path(env).expanduser()
     local = ROOT / ".cache"          # 仓库内自带的缓存（开发/CI 用）
     if local.is_dir():
         return local
-    return Path.home() / ".cache" / "vcut"
+    return Path.home() / ".cache" / "cutnow"
 
 
 CACHE = _cache_root()
 
 
-def _env(name):
-    v = os.environ.get(name)
+def _env(name, legacy=None):
+    v = os.environ.get(name) or (os.environ.get(legacy) if legacy else None)
     return Path(v).expanduser() if v else None
 
 
 def ffmpeg() -> str:
-    p = _env("VCUT_FFMPEG")
+    p = _env("CUTNOW_FFMPEG", "VCUT_FFMPEG")
     if p and p.is_file() and os.access(p, os.X_OK):
         return str(p)
     w = shutil.which("ffmpeg")
@@ -42,15 +42,15 @@ def ffmpeg() -> str:
         pass
     raise RuntimeError(
         "找不到 ffmpeg。装一个（macOS: brew install ffmpeg / Linux: apt install ffmpeg），"
-        "或用 VCUT_FFMPEG 指向可执行文件。")
+        "或用 CUTNOW_FFMPEG 指向可执行文件。")
 
 
 def clip_dir() -> Path:
-    return _env("VCUT_CLIP_DIR") or (CACHE / "clip")
+    return _env("CUTNOW_CLIP_DIR", "VCUT_CLIP_DIR") or (CACHE / "clip")
 
 
 def whisper_cli() -> str:
-    p = _env("VCUT_WHISPER_CLI")
+    p = _env("CUTNOW_WHISPER_CLI", "VCUT_WHISPER_CLI")
     if p and p.is_file():
         return str(p)
     local = CACHE / "whisper" / "whisper-cli"
@@ -59,18 +59,18 @@ def whisper_cli() -> str:
     w = shutil.which("whisper-cli")
     if w:
         return w
-    raise RuntimeError("找不到 whisper-cli：编译 whisper.cpp 或用 VCUT_WHISPER_CLI 指定")
+    raise RuntimeError("找不到 whisper-cli：编译 whisper.cpp 或用 CUTNOW_WHISPER_CLI 指定")
 
 
 def whisper_model() -> Path:
-    p = _env("VCUT_WHISPER_MODEL")
+    p = _env("CUTNOW_WHISPER_MODEL", "VCUT_WHISPER_MODEL")
     if p and p.is_file():
         return p
     for name in ("ggml-small.bin", "ggml-medium.bin", "ggml-base.bin"):
         q = CACHE / "whisper" / name
         if q.is_file():
             return q
-    raise RuntimeError("找不到 whisper 模型：把 ggml-*.bin 放到 %s 或用 VCUT_WHISPER_MODEL 指定"
+    raise RuntimeError("找不到 whisper 模型：把 ggml-*.bin 放到 %s 或用 CUTNOW_WHISPER_MODEL 指定"
                        % (CACHE / "whisper"))
 
 
@@ -83,7 +83,7 @@ def font() -> str:
 
 
 def doctor() -> list:
-    """返回 [(名称, 状态, 说明)]，供 vcut doctor 使用。"""
+    """返回 [(名称, 状态, 说明)]，供 cutnow doctor 使用。"""
     rows = []
     try:
         rows.append(("ffmpeg", "ok", ffmpeg()))

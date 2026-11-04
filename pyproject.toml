@@ -3,9 +3,9 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "vcut"
+name = "cutnow"
 version = "0.1.0"
-description = "Deterministic, inspectable video editing for agents: solutions, ops and EDL."
+description = "Deterministic, inspectable video editing for agents — solutions, ops and EDL."
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.9"
@@ -19,8 +19,8 @@ qc = ["opencv-python-headless>=4.8"]
 dev = ["pytest>=7"]
 
 [project.scripts]
-vcut = "vcut:main"
+cutnow = "cutnow:main"
 
 [tool.setuptools]
-py-modules = ["vcut"]
+py-modules = ["cutnow"]
 packages = ["core"]

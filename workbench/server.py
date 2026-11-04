@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""vcut 工作台：本地 HTTP 服务，把 EDL 画成可操作的时间线。无第三方依赖。"""
+"""cutnow 工作台：本地 HTTP 服务，把 EDL 画成可操作的时间线。无第三方依赖。"""
 import json, os, re, subprocess, sys, threading, time, mimetypes
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs, unquote

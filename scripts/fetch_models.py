@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""按需下载可选模型到缓存目录（默认 ~/.cache/vcut）。"""
+"""按需下载可选模型到缓存目录（默认 ~/.cache/cutnow）。"""
 import argparse, os, sys, urllib.request
 from pathlib import Path
 
-CACHE = Path(os.environ.get("VCUT_CACHE") or (Path.home() / ".cache" / "vcut"))
+CACHE = Path(os.environ.get("CUTNOW_CACHE") or (Path.home() / ".cache" / "vcut"))
 CLIP_BASE = "https://huggingface.co/Xenova/clip-vit-base-patch32/resolve/main"
 CLIP_FILES = ["onnx/vision_model.onnx", "onnx/text_model.onnx", "tokenizer.json"]
 WHISPER_BASE = "https://hf-mirror.com/ggerganov/whisper.cpp/resolve/main"

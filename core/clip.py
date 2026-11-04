@@ -15,7 +15,7 @@ def _ort():
     try:
         import onnxruntime as ort
     except ImportError as e:
-        raise RuntimeError("CLIP 需要 onnxruntime：pip install 'vcut[clip]'") from e
+        raise RuntimeError("CLIP 需要 onnxruntime：pip install 'cutnow[clip]'") from e
     return ort
 
 
@@ -38,7 +38,7 @@ def _tok():
     try:
         from tokenizers import Tokenizer
     except ImportError as e:
-        raise RuntimeError("CLIP 需要 tokenizers：pip install 'vcut[clip]'") from e
+        raise RuntimeError("CLIP 需要 tokenizers：pip install 'cutnow[clip]'") from e
     _sess["tok"] = Tokenizer.from_file(os.path.join(MODEL_DIR, "tokenizer.json"))
     return _sess["tok"]
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""vcut —— 自动剪辑流水线：probe / scenes / beats / plan / render / run"""
+"""cutnow —— 把一条二创拆成可复用的剪辑解法：probe / scenes / beats / plan / render / run"""
 import argparse, json, os, subprocess, sys, time
 from core import analyze as A, plan as P, render as R
 from core import ffmpeg as F
@@ -173,7 +173,7 @@ def cmd_new(args):
             {"id": "analyze", "op": "analyze.standard", "params": {"features": "auto"}},
             {"id": "shots", "op": "select.action", "gate": "confirm", "params": {"target_seconds": 12}},
             {"id": "audio", "op": "audio.chorus", "params": {"in": "auto"}},
-            {"id": "cards", "op": "card.bookends", "params": {"title": name.upper(), "end": "vcut"}},
+            {"id": "cards", "op": "card.bookends", "params": {"title": name.upper(), "end": "cutnow"}},
             {"id": "normalize", "op": "audio.normalize", "params": {"i": -14.0}},
             {"id": "render", "op": "render.edl", "params": {"out": f"out/{name}.mp4"}},
             {"id": "qc", "op": "qc.report", "params": {}},
@@ -182,7 +182,7 @@ def cmd_new(args):
     }
     os.makedirs(_solutions_dir(), exist_ok=True)
     json.dump(tpl, open(path, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
-    print(f"已创建 {path}\n下一步：python -m vcut solution validate {path}")
+    print(f"已创建 {path}\n下一步：cutnow solution validate {path}")
     return 0
 
 
@@ -226,7 +226,7 @@ def cmd_run_solution(args):
 
 def cmd_doctor(args):
     from core import config as C
-    print("vcut doctor\n")
+    print("cutnow doctor\n")
     rows = C.doctor()
     width = max(len(r[0]) for r in rows)
     bad = 0
@@ -304,7 +304,7 @@ def cmd_swap(args):
 
 
 def main():
-    ap = argparse.ArgumentParser(prog="vcut")
+    ap = argparse.ArgumentParser(prog="cutnow")
     sub = ap.add_subparsers(dest="cmd", required=True)
     ls = sub.add_parser("list", help="列出解法与算子")
     ls.set_defaults(func=cmd_list)
