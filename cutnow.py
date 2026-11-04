@@ -123,7 +123,14 @@ def cmd_replace(args):
 
 
 def _solutions_dir():
-    return os.path.join(HERE, "solutions")
+    local = os.path.join(HERE, "solutions")
+    if os.path.isdir(local):
+        return local
+    try:
+        import solutions as pkg          # 安装后随包里的一份
+        return os.path.dirname(pkg.__file__)
+    except ImportError:
+        return local
 
 
 def _resolve_solution(name):
@@ -189,10 +196,10 @@ def cmd_new(args):
 def cmd_serve(args):
     import subprocess
     script = os.path.join(HERE, "workbench", "server.py")
-    if not os.path.exists(script):
-        raise SystemExit("workbench 不在这个发行版里（见 contrib/）")
     print(f"http://127.0.0.1:{args.port}")
-    return subprocess.call([sys.executable, script, str(args.port)])
+    if os.path.exists(script):
+        return subprocess.call([sys.executable, script, str(args.port)])
+    return subprocess.call([sys.executable, "-m", "workbench.server", str(args.port)])
 
 
 def cmd_run_solution(args):

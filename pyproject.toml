@@ -23,4 +23,8 @@ cutnow = "cutnow:main"
 
 [tool.setuptools]
 py-modules = ["cutnow"]
-packages = ["core"]
+packages = ["core", "solutions", "workbench"]
+
+[tool.setuptools.package-data]
+solutions = ["*.json"]
+workbench = ["*.py", "static/*"]

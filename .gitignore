@@ -30,3 +30,7 @@ build/
 tools/features
 tools/classify
 REPORT.md
+
+# 本地密钥
+.ssh/
+.token
