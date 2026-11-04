@@ -1,5 +1,5 @@
 /**
- * vcut 剪辑台（右侧抽屉）：会话不被顶掉，工作台浮在右侧。
+ * cutnow 剪辑台（右侧抽屉）：会话不被顶掉，工作台浮在右侧。
  * 侧栏底部按钮开关；数据来自本地引擎，与 agent 工具同一份 EDL。
  */
 window.__ModuleLoader__.load({
@@ -248,7 +248,7 @@ window.__ModuleLoader__.load({
       const t = T['zh']
       return h('div', { style: S.drawer },
         h('div', { style: S.head },
-          h('strong', { style: { fontSize: 12 } }, 'vcut 剪辑台'),
+          h('strong', { style: { fontSize: 12 } }, 'cutnow 剪辑台'),
           h('span', { style: S.small }, '改一刀 → 左边说一句 → 右边看得见'),
           h('div', { style: { display: 'flex', gap: 4, marginLeft: 'auto' } },
             [['timeline', '时间线'], ['decisions', '决策']].map(([k, label]) => h('button', {
@@ -264,7 +264,7 @@ window.__ModuleLoader__.load({
     function FooterAction({ wide }) {
       return h('button', {
         onClick: toggle,
-        title: 'vcut 剪辑台',
+        title: 'cutnow 剪辑台',
         style: { display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '6px 8px', borderRadius: 6,
           border: 'none', background: 'transparent', color: 'var(--dsw-alias-label-secondary)', cursor: 'pointer', fontSize: 12 },
       },
@@ -272,17 +272,17 @@ window.__ModuleLoader__.load({
           h('rect', { x: 10, y: 14, width: 20, height: 36, rx: 5, fill: 'currentColor' }),
           h('rect', { x: 34, y: 22, width: 9, height: 28, rx: 3, fill: 'currentColor', opacity: 0.7 }),
           h('rect', { x: 46, y: 30, width: 6, height: 20, rx: 2, fill: 'currentColor', opacity: 0.45 })),
-        wide ? h('span', null, 'vcut') : null)
+        wide ? h('span', null, 'cutnow') : null)
     }
 
     return {
       inject: ['slots'],
       apply(ctx) {
         ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register(
-          { name: 'sidebar.footer.action', id: 'vcut', order: 20, label: 'vcut' },
+          { name: 'sidebar.footer.action', id: 'cutnow', order: 20, label: 'cutnow' },
           (props) => h(FooterAction, { ...props })))
         ctx.slots.inject('shell.overlay', () => ctx.slots.register(
-          { name: 'shell.overlay', id: 'vcut', order: 5 },
+          { name: 'shell.overlay', id: 'cutnow', order: 5 },
           (props) => h(Drawer, { ...props, ctx })))
       },
     }
