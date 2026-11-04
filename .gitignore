@@ -25,3 +25,8 @@ build/
 .cache/
 .pylibs
 .pylibs/
+
+# 平台相关二进制与内部文档
+tools/features
+tools/classify
+REPORT.md
