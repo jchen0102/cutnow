@@ -39,7 +39,7 @@ function drawTimeline() {
       <image href="${c.thumb}" x="${x}" y="${trackY}" width="${w}" height="${trackH}" preserveAspectRatio="xMidYMid slice" opacity="0.55" clip-path="inset(0 round 5px)"/>
       <rect x="${x}" y="${trackY}" width="${w}" height="${trackH}" rx="5" fill="none" stroke="${stroke}" stroke-width="${i === sel ? 2 : 1}"/>
       <text x="${x + 6}" y="${trackY + 14}" fill="#e6edf3" font-size="11" font-weight="600">${c.role || ""}</text>
-      <text x="${x + 6}" y="${trackY + 28}" fill="#8b98a8" font-size="10">${c.beats}拍 ${c.dur.toFixed(2)}s</text>
+      <text x="${x + 6}" y="${trackY + 28}" fill="#8b98a8" font-size="10">${c.beats ? c.beats + "拍" : ""} ${c.dur.toFixed(2)}s</text>
       ${c.replaced ? `<circle cx="${x + w - 10}" cy="${trackY + 10}" r="4" fill="#6aa9ff"/>` : ""}
     </g>`;
   });
@@ -55,7 +55,7 @@ function drawShots() {
   $("#shots").innerHTML = S.clips.map((c, i) => `
     <div class="shot ${i === sel ? "sel" : ""}" data-i="${i}">
       <img src="${c.thumb}" alt="">
-      <div class="t"><b>${c.role || "镜头" + (i + 1)} · ${c.beats}拍</b>
+      <div class="t"><b>${c.role || "镜头" + (i + 1)}${c.beats ? " · " + c.beats + "拍" : ""}</b>
         <span>${fmt(c.start)} → ${fmt(c.start + c.dur)} · ${c.dur.toFixed(2)}s</span></div>
       ${c.replaced ? '<i class="dot on" title="已换人"></i>' : ""}
     </div>`).join("");
@@ -124,7 +124,8 @@ function hookPlayer() {
 function renderAll() {
   $("#meta").innerHTML = `<span><b>${S.title}</b></span><span>${S.bpm} BPM</span>
     <span>${S.total?.toFixed(2)}s</span><span>${S.output?.width}×${S.output?.height}</span>
-    <span>${S.clips.filter((c) => c.replaced).length}/${S.clips.length} 已换人</span>`;
+    <span>${S.clips.filter((c) => c.replaced).length}/${S.clips.length} 已换人</span>
+    <span>${S.clips.length} 刀 · ${S.total.toFixed(2)}s</span>`;
   drawShots(); drawTimeline(); drawInspector(); drawOps(); drawVersions();
 }
 

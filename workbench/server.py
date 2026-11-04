@@ -84,12 +84,14 @@ def state():
     repl = read_json(REPL, {}) or {}
     vers = read_json(VERS, []) or []
     cur_edl = os.path.basename(edl_path())
+    cur_meta = read_json(CURRENT, {}) or {}
+    cur_name = (cur_meta.get("solution") or "").replace("-", " ")
     clips = []
     for i, c in enumerate(e.get("video", [])):
         clips.append({**c, "index": i, "replaced": str(i) in repl,
                       "thumb": f"/api/thumb?i={i}"})
     return {
-        "title": r.get("title", "未命名"),
+        "title": cur_name or r.get("title") or "未命名",
         "edl": cur_edl,
         "id": r.get("id"),
         "bpm": bpm(),
