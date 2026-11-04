@@ -1,0 +1,18 @@
+{
+  "meta": {
+    "title": "vcut 剪辑台",
+    "description": "基于真实 EDL 的时间线工作台：查看镜头、改拍点、渲染版本；agent 工具改的是同一份文档。"
+  },
+  "panel": {
+    "title": "vcut 剪辑台",
+    "render": "渲染新版本",
+    "rendering": "渲染中…",
+    "shots": "镜头",
+    "versions": "版本",
+    "decisions": "决策",
+    "beats": "拍数",
+    "start": "源起点",
+    "apply": "应用",
+    "empty": "还没有版本"
+  }
+}

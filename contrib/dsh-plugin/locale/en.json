@@ -1,0 +1,18 @@
+{
+  "meta": {
+    "title": "vcut Editor",
+    "description": "Timeline workbench over a real EDL: inspect shots, retime cuts, render versions. Agent tools edit the same document."
+  },
+  "panel": {
+    "title": "vcut Editor",
+    "render": "Render",
+    "rendering": "Rendering…",
+    "shots": "Shots",
+    "versions": "Versions",
+    "decisions": "Decisions",
+    "beats": "Beats",
+    "start": "Source in",
+    "apply": "Apply",
+    "empty": "No version yet"
+  }
+}

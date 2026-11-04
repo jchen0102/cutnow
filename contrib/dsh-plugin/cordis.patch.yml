@@ -1,0 +1,6 @@
+- insert:
+    - id: cutnow-panel
+      name: '@local/cutnow-panel'
+      config:
+        root: /Users/jiaochen/Downloads/vibecoding/edit-core
+        port: 8799
