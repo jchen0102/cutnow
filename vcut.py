@@ -122,6 +122,108 @@ def cmd_replace(args):
     return 0
 
 
+def _solutions_dir():
+    return os.path.join(HERE, "solutions")
+
+
+def _resolve_solution(name):
+    """接受解法名（可缩写）或路径。"""
+    if os.path.sep in name or name.endswith(".json"):
+        return name if os.path.isabs(name) else os.path.join(HERE, name)
+    import glob
+    for p in sorted(glob.glob(os.path.join(_solutions_dir(), "*.solution.json"))):
+        base = os.path.basename(p).replace(".solution.json", "")
+        if name in (base, base.split("-")[0]):
+            return p
+    raise SystemExit(f"找不到解法 {name!r}；可用：{', '.join(_solution_names())}")
+
+
+def _solution_names():
+    import glob
+    return [os.path.basename(p).replace(".solution.json", "")
+            for p in sorted(glob.glob(os.path.join(_solutions_dir(), "*.solution.json")))]
+
+
+def cmd_list(args):
+    from core import ops, builtin_ops  # noqa: F401
+    print("解法：")
+    for p in sorted(__import__("glob").glob(os.path.join(_solutions_dir(), "*.solution.json"))):
+        try:
+            from core import solution as SOL
+            sol = SOL.load(p, ops.OPS)
+            print(f"  {sol['id']:18} {sol['name']:12} {sol.get('output_kind','mp4'):9} {len(sol['steps'])} 步")
+        except Exception as e:
+            print(f"  ! {os.path.basename(p)}  {e}")
+    print(f"\n算子 {len(ops.OPS)} 个：{', '.join(ops.names())}")
+    return 0
+
+
+def cmd_new(args):
+    name = args.name
+    path = os.path.join(_solutions_dir(), f"{name}.solution.json")
+    if os.path.exists(path) and not args.force:
+        raise SystemExit(f"{path} 已存在（加 --force 覆盖）")
+    tpl = {
+        "id": name, "name": name, "description": "一句话说明这个解法做什么",
+        "inputs": {"source": {"type": "video", "required": True},
+                   "music": {"type": "audio", "required": True}},
+        "output": {"width": 1280, "height": 720, "fps": 30, "container": "mp4"},
+        "output_kind": "mp4",
+        "steps": [
+            {"id": "analyze", "op": "analyze.standard", "params": {"features": "auto"}},
+            {"id": "shots", "op": "select.action", "gate": "confirm", "params": {"target_seconds": 12}},
+            {"id": "audio", "op": "audio.chorus", "params": {"in": "auto"}},
+            {"id": "cards", "op": "card.bookends", "params": {"title": name.upper(), "end": "vcut"}},
+            {"id": "normalize", "op": "audio.normalize", "params": {"i": -14.0}},
+            {"id": "render", "op": "render.edl", "params": {"out": f"out/{name}.mp4"}},
+            {"id": "qc", "op": "qc.report", "params": {}},
+        ],
+        "outputs": ["mp4"], "capabilities": [],
+    }
+    os.makedirs(_solutions_dir(), exist_ok=True)
+    json.dump(tpl, open(path, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+    print(f"已创建 {path}\n下一步：python -m vcut solution validate {path}")
+    return 0
+
+
+def cmd_serve(args):
+    import subprocess
+    script = os.path.join(HERE, "workbench", "server.py")
+    if not os.path.exists(script):
+        raise SystemExit("workbench 不在这个发行版里（见 contrib/）")
+    print(f"http://127.0.0.1:{args.port}")
+    return subprocess.call([sys.executable, script, str(args.port)])
+
+
+def cmd_run_solution(args):
+    from core import ops, builtin_ops  # noqa: F401
+    from core import solution as SOL, runner
+    path = _resolve_solution(args.solution)
+    sol = SOL.load(path, ops.OPS)
+    overrides = {}
+    if args.source:
+        overrides["source"] = args.source
+    if args.music:
+        overrides["music"] = args.music
+    if args.out:
+        for st in sol["steps"]:
+            if st["op"] == "render.edl":
+                st["params"]["out"] = args.out
+    print(f"解法 {sol['id']} · {sol['name']} · {len(sol['steps'])} 步")
+    os.chdir(HERE)
+    ctx = runner.run(sol, HERE, overrides=overrides, yes=args.yes, on_log=print)
+    edl_path = os.path.join(HERE, "out", f"edl_{sol['id']}.json")
+    os.makedirs(os.path.dirname(edl_path), exist_ok=True)
+    json.dump(ctx["edl"], open(edl_path, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+    json.dump({"edl": os.path.relpath(edl_path, HERE), "solution": sol["id"]},
+              open(os.path.join(HERE, "out", "current.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+    if args.json:
+        print(json.dumps({"solution": sol["id"], "steps": ctx["log"]}, ensure_ascii=False))
+    for r in ctx.get("renders", []):
+        print(f"成片 {r['file']}  {r['bytes']/1e6:.1f}MB  sha256={r['sha256']}")
+    return 0
+
+
 def cmd_doctor(args):
     from core import config as C
     print("vcut doctor\n")
@@ -204,15 +306,36 @@ def cmd_swap(args):
 def main():
     ap = argparse.ArgumentParser(prog="vcut")
     sub = ap.add_subparsers(dest="cmd", required=True)
-    r = sub.add_parser("run", help="跑完整流水线")
-    r.add_argument("recipe")
-    r.add_argument("--out")
-    r.add_argument("--suffix", default="")
-    r.add_argument("--crf", type=int, default=20)
-    r.add_argument("--preset", default="medium")
-    r.add_argument("--threads", type=int, default=2)
-    r.add_argument("--report", action="store_true")
-    r.set_defaults(func=cmd_run)
+    ls = sub.add_parser("list", help="列出解法与算子")
+    ls.set_defaults(func=cmd_list)
+
+    nw = sub.add_parser("new", help="新建一个解法骨架")
+    nw.add_argument("name")
+    nw.add_argument("--force", action="store_true")
+    nw.set_defaults(func=cmd_new)
+
+    sv = sub.add_parser("serve", help="启动本地工作台")
+    sv.add_argument("--port", type=int, default=8799)
+    sv.set_defaults(func=cmd_serve)
+
+    r = sub.add_parser("run", help="跑一个解法")
+    r.add_argument("solution", help="解法名（可缩写）或 .solution.json 路径")
+    r.add_argument("--source", help="素材路径（覆盖解法默认值）")
+    r.add_argument("--music", help="音乐路径")
+    r.add_argument("--out", help="输出文件")
+    r.add_argument("--yes", action="store_true", help="跳过人工闸门（复现用）")
+    r.add_argument("--json", action="store_true", help="打印 JSON 结果（给脚本/agent 用）")
+    r.set_defaults(func=cmd_run_solution)
+
+    rr = sub.add_parser("run-recipe", help="跑旧的 recipe 流水线")
+    rr.add_argument("recipe")
+    rr.add_argument("--out")
+    rr.add_argument("--suffix", default="")
+    rr.add_argument("--crf", type=int, default=20)
+    rr.add_argument("--preset", default="medium")
+    rr.add_argument("--threads", type=int, default=2)
+    rr.add_argument("--report", action="store_true")
+    rr.set_defaults(func=cmd_run)
     sw = sub.add_parser("swap", help="本地换脸")
     sw.add_argument("--in", dest="input", required=True)
     sw.add_argument("--face", required=True, help="源人脸图片")

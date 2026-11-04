@@ -11,7 +11,7 @@ license = { text = "MIT" }
 requires-python = ">=3.9"
 authors = [{ name = "vcut contributors" }]
 keywords = ["video", "editing", "ffmpeg", "edl", "agent", "clip"]
-dependencies = ["numpy>=1.22"]
+dependencies = ["numpy>=1.22", "imageio-ffmpeg>=0.4"]  # 自带 ffmpeg，装完即可用
 
 [project.optional-dependencies]
 clip = ["onnxruntime>=1.16", "tokenizers>=0.15"]
