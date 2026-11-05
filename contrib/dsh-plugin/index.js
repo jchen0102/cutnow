@@ -1,5 +1,5 @@
 /**
- * vcut 剪辑工作台 — Host 侧。
+ * cutnow 剪辑工作台 — Host 侧。
  * 三个工具直连本地引擎（edit-core/workbench/server.py），与面板共用同一份 EDL。
  * 工具注册失败不拖垮插件：错误写到 edit-core/out/plugin-errors.log，面板照常工作。
  */
@@ -135,4 +135,7 @@ export function apply(ctx, config) {
     }
   }
   log('apply done')
+
+  // 插件激活时就把引擎拉起来：否则应用重启后，面板会一直显示"连不上本地引擎"
+  ensure().then(() => log('engine ready')).catch((e) => log(`engine autostart failed: ${e && e.message}`))
 }
