@@ -9,9 +9,12 @@
 [![python](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://pypi.org/project/cutnow/)
 [![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-[中文](README.zh-CN.md) · [Docs](docs/) · [Examples](solutions/)
+[中文](README.zh-CN.md) · [Docs](docs/) · [Examples](solutions/) · [Agent skill](skill/SKILL.md) · [速查](dist/cutnow-lite.md)
 
 </div>
+
+> You have the footage. You have the track. And every week you rebuild the same fifteen-second cut
+> by hand — then nobody can tell you why last week's version felt better.
 
 ![cutnow demo](docs/images/demo.gif)
 

@@ -9,9 +9,12 @@
 [![python](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://pypi.org/project/cutnow/)
 [![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-[English](README.md) · [文档](docs/) · [内置解法](solutions/)
+[English](README.md) · [文档](docs/) · [内置解法](solutions/) · [Agent Skill](skill/SKILL.md) · [速查](dist/cutnow-lite.md)
 
 </div>
+
+> 素材在硬盘里，歌也选好了。每周你还是把同一条十五秒的片子重剪一遍，
+> 而且没人说得清上一版到底好在哪。
 
 ![cutnow 演示](docs/images/demo.gif)
 
