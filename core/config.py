@@ -1,6 +1,8 @@
 """路径与外部依赖解析：环境变量 > 缓存目录 > PATH。不写死任何绝对路径。"""
 import os
+import re
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -28,21 +30,57 @@ def _env(name, legacy=None):
     return Path(v).expanduser() if v else None
 
 
-def ffmpeg() -> str:
+_FFMPEG = None
+_FILTERS = {}
+
+
+def _filters(exe: str):
+    if exe not in _FILTERS:
+        try:
+            out = subprocess.run([exe, "-hide_banner", "-filters"], capture_output=True, text=True).stdout
+            _FILTERS[exe] = set(re.findall(r"^\s*\S+\s+(\w+)\s", out, re.M))
+        except Exception:
+            _FILTERS[exe] = set()
+    return _FILTERS[exe]
+
+
+def has_filter(name: str) -> bool:
+    try:
+        return name in _filters(ffmpeg())
+    except Exception:
+        return False
+
+
+def _candidates():
     p = _env("CUTNOW_FFMPEG", "VCUT_FFMPEG")
     if p and p.is_file() and os.access(p, os.X_OK):
-        return str(p)
+        yield str(p)
     w = shutil.which("ffmpeg")
     if w:
-        return w
+        yield w
     try:
         import imageio_ffmpeg  # 可选依赖
-        return imageio_ffmpeg.get_ffmpeg_exe()
+        yield imageio_ffmpeg.get_ffmpeg_exe()
     except Exception:
         pass
-    raise RuntimeError(
-        "找不到 ffmpeg。装一个（macOS: brew install ffmpeg / Linux: apt install ffmpeg），"
-        "或用 CUTNOW_FFMPEG 指向可执行文件。")
+
+
+def ffmpeg() -> str:
+    global _FFMPEG
+    if _FFMPEG:
+        return _FFMPEG
+    found = list(_candidates())
+    if not found:
+        raise RuntimeError(
+            "找不到 ffmpeg。装一个（macOS: brew install ffmpeg / Linux: apt install ffmpeg），"
+            "或用 CUTNOW_FFMPEG 指向可执行文件。")
+    # imageio-ffmpeg 的 Linux 构建不带 libfreetype，烧不了字幕；优先带 drawtext 的
+    for exe in found:
+        if "drawtext" in _filters(exe):
+            _FFMPEG = exe
+            return exe
+    _FFMPEG = found[0]
+    return _FFMPEG
 
 
 def clip_dir() -> Path:

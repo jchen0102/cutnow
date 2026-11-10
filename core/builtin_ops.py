@@ -284,7 +284,11 @@ def qc_report(ctx, params):
         if str(c.get("asset", "")).startswith("card"):
             ignore.append((max(0.0, t - 0.4), t + c["dur"] + 0.4))
         t += c["dur"]
-    rep = qc.report(path, ctx["edl"], params.get("thresholds"), ignore=ignore)
+    subs_burned = True
+    if ctx.get("renders"):
+        subs_burned = ctx["renders"][-1].get("subs_burned", True)
+    rep = qc.report(path, ctx["edl"], params.get("thresholds"), ignore=ignore,
+                    skip_subtitles=not subs_burned)
     ctx["qc"] = rep
     return {"pass": rep["pass"], "failed": rep["failed"],
             "duration": rep["checks"]["duration"]["value"],

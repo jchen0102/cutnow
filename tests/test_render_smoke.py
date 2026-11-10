@@ -57,9 +57,12 @@ def test_render_and_qc(clip, tmp_path):
     assert os.path.getsize(out) > 10_000
     assert len(res["sha256"]) == 64
 
-    rep = qc.report(out, edl)
+    rep = qc.report(out, edl, skip_subtitles=not res["subs_burned"])
     assert rep["checks"]["duration"]["ok"], rep["checks"]["duration"]
     assert rep["checks"]["subtitles"]["ok"], rep["checks"]["subtitles"]
+    # 没有 drawtext 的环境会跳过字幕，但必须给出 warning，而不是静默
+    if not res["subs_burned"]:
+        assert res["warnings"], "跳过字幕时必须报告原因"
 
 
 def test_render_is_deterministic(clip, tmp_path):

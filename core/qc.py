@@ -58,7 +58,7 @@ def subtitle_fit(edl):
             "overflow": worst > limit}
 
 
-def report(path, edl, thresholds=None, ignore=None):
+def report(path, edl, thresholds=None, ignore=None, skip_subtitles=False):
     th = {"duration_tolerance": 0.15, "black_max": 0.5,
           "lufs_min": -26.0, "lufs_max": -10.0, "sharp_min": 30.0}
     th.update(thresholds or {})
@@ -75,6 +75,9 @@ def report(path, edl, thresholds=None, ignore=None):
     loud = loudness(path)
     sharp = sharpness(path, points=(0.35, 0.5, 0.65))
     subs = subtitle_fit(edl)
+    if skip_subtitles:
+        subs = {"max_chars_per_line": subs["max_chars_per_line"], "longest_cue": subs["longest_cue"],
+                "overflow": False, "skipped": True}
 
     checks = {
         "duration": {"value": round(dur, 3), "expect": expect,

@@ -1,7 +1,7 @@
 """ffmpeg 定位与薄封装。"""
 import os, subprocess, json, re, sys
 
-from .config import ffmpeg  # noqa: F401  统一由 config 解析（env > PATH > imageio_ffmpeg）
+from .config import ffmpeg, has_filter  # noqa: F401  统一由 config 解析（env > PATH > imageio_ffmpeg）
 
 def run(args, capture=True):
     p = subprocess.run([ffmpeg(), "-hide_banner", "-nostdin", *args],

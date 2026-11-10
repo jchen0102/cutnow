@@ -67,10 +67,18 @@ def build(edl, workdir, out_path, crf=20, preset="medium", threads=2, blur=18, r
     parts.append("".join(labels) + f"concat=n={len(labels)}:v=1:a=0,setsar=1[vc]")
 
     vout = "[vc]"
-    if edl.get("subs"):
-        fp = font()
+    warnings = []
+    subs = edl.get("subs") or []
+    fp = font()
+    if subs and not fp:
+        warnings.append("找不到中文字体，字幕已跳过")
+        subs = []
+    elif subs and not F.has_filter("drawtext"):
+        warnings.append("当前 ffmpeg 不带 drawtext（libfreetype），字幕已跳过")
+        subs = []
+    if subs:
         chain = []
-        for i, s in enumerate(edl["subs"]):
+        for i, s in enumerate(subs):
             tf = _txt(os.path.join(workdir, f"cue_{i}.txt"), s["text"])
             size = min(int(H * 0.058), int(W * 0.055))   # 窄画幅按宽度收敛，避免字幕溢出
             size = max(18, size)
@@ -102,12 +110,13 @@ def build(edl, workdir, out_path, crf=20, preset="medium", threads=2, blur=18, r
            "-movflags", "+faststart",
            "-fflags", "+bitexact", "-flags:v", "+bitexact", "-flags:a", "+bitexact",
            "-map_metadata", "-1", out_path]
-    return cmd, graph
+    return cmd, graph, warnings
 
 def render(edl, workdir, out_path, **kw):
-    cmd, graph = build(edl, workdir, out_path, **kw)
+    cmd, graph, warnings = build(edl, workdir, out_path, **kw)
     p = subprocess.run(cmd, capture_output=True, text=True)
     if p.returncode != 0:
         raise RuntimeError(p.stderr[-2500:])
     return {"path": out_path, "sha256": F.sha256(out_path), "bytes": os.path.getsize(out_path),
-            "graph_chars": len(graph)}
+            "graph_chars": len(graph), "warnings": warnings,
+            "subs_burned": bool((edl.get("subs") or []) and not warnings)}
