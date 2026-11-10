@@ -371,4 +371,16 @@ def main():
     sys.exit(args.func(args))
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except SystemExit:
+        raise
+    except KeyboardInterrupt:
+        print("\n已中断", file=sys.stderr)
+        sys.exit(130)
+    except Exception as e:                     # 给人看的错误，不甩调用栈
+        print(f"错误：{e}", file=sys.stderr)
+        print("（想看调用栈就设 CUTNOW_DEBUG=1）", file=sys.stderr)
+        if os.environ.get("CUTNOW_DEBUG"):
+            raise
+        sys.exit(1)

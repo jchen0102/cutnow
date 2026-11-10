@@ -19,6 +19,14 @@ def _default_inputs(sol, overrides):
 
 def run(sol, root, overrides=None, yes=False, allow_caps=("",), on_log=print):
     inputs = _default_inputs(sol, overrides)
+    for key, path in inputs.items():
+        if not path:
+            continue
+        full = path if os.path.isabs(path) else os.path.join(root, path)
+        if not os.path.exists(full):
+            raise FileNotFoundError(
+                f"找不到输入 {key}：{path}\n"
+                f"用 --{key} 指定文件，例如：cutnow run {sol['id']} --{key} /path/to/file")
     ctx = {
         "root": root,
         "solution": sol,

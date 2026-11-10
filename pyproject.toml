@@ -4,12 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cutnow"
-version = "0.1.0"
+version = "0.1.1"
 description = "Deterministic, inspectable video editing for agents — solutions, ops and EDL."
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.9"
-authors = [{ name = "vcut contributors" }]
+authors = [{ name = "jchen0102", email = "jchen0102@users.noreply.github.com" }]
 keywords = ["video", "editing", "ffmpeg", "edl", "agent", "clip"]
 dependencies = ["numpy>=1.22", "imageio-ffmpeg>=0.4"]  # 自带 ffmpeg，装完即可用
 
