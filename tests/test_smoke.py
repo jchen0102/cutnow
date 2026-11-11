@@ -53,3 +53,12 @@ def test_shot_duration_matches_beats():
         video.append({"beats": beats, "dur": beats * beat, "at": total})
         total += beats * beat
     assert total == pytest.approx(12.0)
+
+
+def test_version_matches_pyproject():
+    import re
+    from core import __version__
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    txt = open(os.path.join(root, "pyproject.toml"), encoding="utf-8").read()
+    m = re.search(r'^version = "([^"]+)"', txt, re.M)
+    assert m and m.group(1) == __version__, f"pyproject={m and m.group(1)} core={__version__}"

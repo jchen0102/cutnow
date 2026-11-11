@@ -310,9 +310,10 @@ def cmd_swap(args):
     return 0
 
 
-def main():
+def _run():
     ap = argparse.ArgumentParser(prog="cutnow")
-    sub = ap.add_subparsers(dest="cmd", required=True)
+    ap.add_argument("--version", action="store_true", help="显示版本")
+    sub = ap.add_subparsers(dest="cmd", required=False)
     ls = sub.add_parser("list", help="列出解法与算子")
     ls.set_defaults(func=cmd_list)
 
@@ -368,19 +369,31 @@ def main():
     rp.add_argument("--render", action="store_true", help="回填后立即重渲")
     rp.set_defaults(func=cmd_replace)
     args = ap.parse_args()
-    sys.exit(args.func(args))
+    if getattr(args, "version", False):
+        from core import __version__ as v
+        print(f"cutnow {v}")
+        return 0
+    if not getattr(args, "func", None):
+        ap.print_help()
+        return 2
+    return args.func(args) or 0
 
-if __name__ == "__main__":
+def main():
+    """控制台入口：所有错误在这里变成一句话，不甩调用栈。"""
     try:
-        main()
+        return _run()
     except SystemExit:
         raise
     except KeyboardInterrupt:
         print("\n已中断", file=sys.stderr)
-        sys.exit(130)
-    except Exception as e:                     # 给人看的错误，不甩调用栈
+        return 130
+    except Exception as e:
         print(f"错误：{e}", file=sys.stderr)
         print("（想看调用栈就设 CUTNOW_DEBUG=1）", file=sys.stderr)
         if os.environ.get("CUTNOW_DEBUG"):
             raise
-        sys.exit(1)
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
