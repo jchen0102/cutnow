@@ -5,13 +5,11 @@
   "inputs": {
     "source": {
       "type": "video",
-      "required": true,
-      "default": "assets/src_jam.mp4"
+      "required": true
     },
     "music": {
       "type": "audio",
-      "required": true,
-      "default": "assets/beat_it.m4a"
+      "required": true
     }
   },
   "output": {

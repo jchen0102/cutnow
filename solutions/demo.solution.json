@@ -1,0 +1,99 @@
+{
+  "id": "demo",
+  "name": "内置演示",
+  "description": "用一段自动生成的测试素材出一条片，验证安装是否正常",
+  "inputs": {
+    "source": {
+      "type": "video",
+      "required": true
+    }
+  },
+  "output": {
+    "width": 1280,
+    "height": 720,
+    "fps": 30,
+    "container": "mp4"
+  },
+  "output_kind": "mp4",
+  "steps": [
+    {
+      "id": "analyze",
+      "op": "analyze.media",
+      "params": {
+        "bpm": 120
+      }
+    },
+    {
+      "id": "shots",
+      "op": "select.shots",
+      "params": {
+        "shots": [
+          [
+            0.0,
+            4
+          ],
+          [
+            2.5,
+            4
+          ],
+          [
+            5.0,
+            4
+          ]
+        ]
+      }
+    },
+    {
+      "id": "cleanup",
+      "op": "cleanup.crop",
+      "params": {
+        "crop": "full"
+      }
+    },
+    {
+      "id": "audio",
+      "op": "audio.from_clips",
+      "params": {
+        "out": "out/demo_audio.m4a"
+      }
+    },
+    {
+      "id": "cards",
+      "op": "card.bookends",
+      "params": {
+        "title": "CUTNOW",
+        "sub": "demo",
+        "end": "ok",
+        "head_dur": 1.0,
+        "tail_dur": 1.0
+      }
+    },
+    {
+      "id": "normalize",
+      "op": "audio.normalize",
+      "params": {
+        "i": -14.0
+      }
+    },
+    {
+      "id": "render",
+      "op": "render.edl",
+      "params": {
+        "out": "out/demo.mp4"
+      }
+    },
+    {
+      "id": "qc",
+      "op": "qc.report",
+      "params": {
+        "thresholds": {
+          "duration_tolerance": 0.3
+        }
+      }
+    }
+  ],
+  "outputs": [
+    "mp4"
+  ],
+  "capabilities": []
+}

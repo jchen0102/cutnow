@@ -5,7 +5,10 @@ from . import analyze as A
 
 def audio_env(path, hop=0.1, sr=22050):
     """整段音频的短时能量包络（0-1 归一化）。"""
-    x = A.decode_audio(path, sr)
+    try:
+        x = A.decode_audio(path, sr)
+    except Exception:
+        return None, sr
     if x is None or len(x) == 0:
         return None, sr
     n = int(hop * sr)

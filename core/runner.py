@@ -22,7 +22,12 @@ def run(sol, root, overrides=None, yes=False, allow_caps=("",), on_log=print):
     for key, path in inputs.items():
         if not path:
             continue
-        full = path if os.path.isabs(path) else os.path.join(root, path)
+        if os.path.isabs(path):
+            full = path
+        else:
+            # 用户给的相对路径应该相对「他执行命令的目录」，而不是包的安装目录
+            full = next((c for c in (os.path.join(os.getcwd(), path), os.path.join(root, path))
+                         if os.path.exists(c)), os.path.join(root, path))
         if not os.path.exists(full):
             raise FileNotFoundError(
                 f"找不到输入 {key}：{path}\n"

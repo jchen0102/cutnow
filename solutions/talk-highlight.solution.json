@@ -5,8 +5,7 @@
   "inputs": {
     "source": {
       "type": "video",
-      "required": true,
-      "default": "assets/talk_src.mp4"
+      "required": true
     }
   },
   "output": {

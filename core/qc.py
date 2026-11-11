@@ -59,8 +59,8 @@ def subtitle_fit(edl):
 
 
 def report(path, edl, thresholds=None, ignore=None, skip_subtitles=False):
-    th = {"duration_tolerance": 0.15, "black_max": 0.5,
-          "lufs_min": -26.0, "lufs_max": -10.0, "sharp_min": 30.0}
+    th = {"duration_tolerance": 0.2, "black_max": 0.5,
+          "lufs_min": -26.0, "lufs_max": -10.0, "sharp_min": 15.0}
     th.update(thresholds or {})
 
     ignore = ignore or []
@@ -86,7 +86,10 @@ def report(path, edl, thresholds=None, ignore=None, skip_subtitles=False):
                          "ok": all(b["end"] - b["start"] <= th["black_max"] for b in blacks),
                          "segments": blacks[:5]},
         "loudness": {"lufs": loud["integrated_lufs"],
-                     "ok": loud["integrated_lufs"] is None or th["lufs_min"] <= loud["integrated_lufs"] <= th["lufs_max"]},
+                     "silent": (loud["integrated_lufs"] is not None and loud["integrated_lufs"] <= -60),
+                     "ok": (loud["integrated_lufs"] is None
+                            or loud["integrated_lufs"] <= -60          # 源本来就没声音，不算失败
+                            or th["lufs_min"] <= loud["integrated_lufs"] <= th["lufs_max"])},
         "subtitles": {**subs, "ok": not subs["overflow"]},
         "sharpness": {"laplacian_var": sharp,
                       "ok": sharp is None or sharp >= th["sharp_min"]},

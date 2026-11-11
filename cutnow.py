@@ -193,6 +193,28 @@ def cmd_new(args):
     return 0
 
 
+def cmd_demo(args):
+    """零素材演示：生成一段测试画面 → 跑内置 demo 解法 → 告诉用户文件在哪。"""
+    import tempfile
+    from core import ffmpeg as F
+    work = tempfile.mkdtemp(prefix="cutnow-demo-")
+    src = os.path.join(work, "demo-src.mp4")
+    print("① 生成测试素材 …")
+    p = F.run(["-y", "-f", "lavfi", "-i", "testsrc2=size=1280x720:rate=30:duration=9",
+               "-f", "lavfi", "-i", "sine=frequency=330:duration=9",
+               "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", src])
+    if p.returncode != 0:
+        raise RuntimeError(p.stderr[-400:])
+    out = os.path.abspath(args.out)
+    print(f"② 跑内置解法 demo → {out}")
+    rc = cmd_run_solution(argparse.Namespace(
+        solution="demo", source=src, music=None, out=out, yes=True, json=False))
+    if rc == 0 and os.path.exists(out):
+        print(f"\n完成：{out}  {os.path.getsize(out)/1e6:.1f}MB")
+        print("打开看看，这就是 cutnow 的产物格式（片头卡 + 三段 + 片尾卡 + 质检）。")
+    return rc
+
+
 def cmd_serve(args):
     import subprocess
     script = os.path.join(HERE, "workbench", "server.py")
@@ -209,9 +231,9 @@ def cmd_run_solution(args):
     sol = SOL.load(path, ops.OPS)
     overrides = {}
     if args.source:
-        overrides["source"] = args.source
+        overrides["source"] = os.path.abspath(args.source)
     if args.music:
-        overrides["music"] = args.music
+        overrides["music"] = os.path.abspath(args.music)
     if args.out:
         for st in sol["steps"]:
             if st["op"] == "render.edl":
@@ -321,6 +343,10 @@ def _run():
     nw.add_argument("name")
     nw.add_argument("--force", action="store_true")
     nw.set_defaults(func=cmd_new)
+
+    dm = sub.add_parser("demo", help="零素材跑一条演示片")
+    dm.add_argument("--out", default="cutnow-demo.mp4")
+    dm.set_defaults(func=cmd_demo)
 
     sv = sub.add_parser("serve", help="启动本地工作台")
     sv.add_argument("--port", type=int, default=8799)

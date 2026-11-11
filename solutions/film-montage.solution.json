@@ -5,13 +5,11 @@
   "inputs": {
     "source": {
       "type": "video",
-      "required": true,
-      "default": "assets/tos/tos_720p.mov"
+      "required": true
     },
     "music": {
       "type": "audio",
-      "required": true,
-      "default": "assets/tos/battle.mp3"
+      "required": true
     }
   },
   "output": {

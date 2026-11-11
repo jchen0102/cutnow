@@ -20,7 +20,8 @@
 
 ```bash
 pip install cutnow
-cutnow doctor
+cutnow doctor            # 缺什么、怎么装，一条条列出来
+cutnow demo              # 不需要素材：5 秒出一条 cutnow-demo.mp4
 cutnow run sports --source 比赛.mp4 --out 集锦.mp4
 ```
 

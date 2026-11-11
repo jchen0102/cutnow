@@ -20,7 +20,8 @@
 
 ```bash
 pip install cutnow
-cutnow doctor
+cutnow doctor            # what's missing, and how to fix it
+cutnow demo              # no footage needed: renders cutnow-demo.mp4 in ~5s
 cutnow run sports --source match.mp4 --out highlight.mp4
 ```
 

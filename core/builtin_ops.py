@@ -23,17 +23,35 @@ def analyze_standard(ctx, params):
         feat_path = os.path.join(ctx["root"], "out", f"features_{tag}.jsonl")
         if not os.path.exists(feat_path):
             exe = os.path.join(ctx["root"], "tools", "features")
-            _sp.run([exe, src, feat_path, str(params.get("sample", 0.5))], check=True)
+            if os.path.exists(exe):
+                _sp.run([exe, src, feat_path, str(params.get("sample", 0.5))], check=True)
+            else:
+                from . import featpy
+                featpy.extract(src, feat_path, interval=float(params.get("sample", 0.5)))
     else:
         feat_path = os.path.join(ctx["root"], feat_spec)
     rows = A.load_features(feat_path) if os.path.exists(feat_path) else []
-    music = _ctx_path(ctx, "music", "assets/beat_it.m4a")
-    x = A.decode_audio(music)
-    bpm, beats = A.estimate_beat(x, 22050)
-    chorus = A.loudest_window(x, 22050, params.get("chorus_window", 26.0))
+    music = ctx["inputs"].get("music")
+    music_abs = None
+    if music:
+        music_abs = music if os.path.isabs(music) else os.path.join(ctx["root"], music)
+        if not os.path.exists(music_abs):
+            music_abs = None
+    if music_abs:
+        try:
+            x = A.decode_audio(music_abs)
+            bpm, beats = A.estimate_beat(x, 22050)
+            chorus = A.loudest_window(x, 22050, params.get("chorus_window", 26.0))
+        except Exception:
+            x, bpm, beats, chorus = None, 120.0, [], 0.0
+    else:
+        # 没有音乐：用稳定节拍网格（120 BPM = 每拍 0.5s），不要拿对白去猜 BPM
+        x, bpm, beats, chorus = None, 120.0, [], 0.0
     ctx["analysis"] = {"probe": info, "scenes": scenes, "rows": rows,
                        "bpm": bpm, "beats": [float(b) for b in beats],
-                       "chorus_start": round(chorus, 3), "music_duration": len(x) / 22050}
+                       "chorus_start": round(chorus, 3),
+                       "music_duration": (len(x) / 22050) if x is not None else 0.0,
+                       "has_music": bool(music_abs)}
     return {"scenes": len(scenes), "features": len(rows), "bpm": bpm, "chorus_start": ctx["analysis"]["chorus_start"]}
 
 
@@ -61,6 +79,8 @@ def select_shots(ctx, params):
 @ops.register("audio.chorus", "把音乐对齐到能量最大窗口", inputs=["music"], outputs=["audio"])
 def audio_chorus(ctx, params):
     a = ctx["analysis"]
+    if not a.get("has_music"):
+        return audio_from_clips(ctx, {"out": params.get("out", "out/source_audio.m4a")})
     total = ctx["edl"]["total"]
     start = params.get("in")
     if start in (None, "auto"):
@@ -119,7 +139,9 @@ def analyze_media(ctx, params):
     src = _ctx_path(ctx, "source", "assets/src_jam.mp4")
     info = F.probe(src)
     scenes = A.scenes(src, params.get("scene_threshold", 0.3))
-    ctx["analysis"] = {"probe": info, "scenes": scenes, "bpm": None}
+    ctx["analysis"] = {"probe": info, "scenes": scenes,
+                       "bpm": float(params.get("bpm", 120.0)),
+                       "has_music": False, "chorus_start": 0.0}
     return {"duration": info["duration"], "scenes": len(scenes),
             "size": [info["width"], info["height"]]}
 
@@ -246,6 +268,16 @@ def audio_from_clips(ctx, params):
     src = _ctx_path(ctx, "source", "")
     out = os.path.join(ctx["root"], params.get("out", "out/talk_audio.m4a"))
     os.makedirs(os.path.dirname(out), exist_ok=True)
+    if not F.probe(src).get("has_audio"):
+        total = ctx["edl"]["total"]
+        p = F.run(["-y", "-f", "lavfi", "-i", "anullsrc=channel_layout=mono:sample_rate=48000",
+                   "-t", f"{total:.3f}", "-c:a", "aac", out])
+        if p.returncode != 0:
+            raise ops.OpError(p.stderr[-300:])
+        ctx["edl"]["assets"] = [a for a in ctx["edl"]["assets"] if a["id"] != "music"]
+        ctx["edl"]["assets"].append({"id": "music", "path": os.path.relpath(out, ctx["root"])})
+        ctx["edl"]["audio"] = [{"asset": "music", "in": 0.0, "dur": total, "gain_db": 0.0}]
+        return {"file": os.path.relpath(out, ctx["root"]), "dur": total, "silent": True}
     parts, labels = [], []
     for i, c in enumerate(ctx["edl"]["video"]):
         parts.append(f"[0:a]atrim=start={c['start']:.3f}:duration={c['dur']:.3f},asetpts=PTS-STARTPTS[a{i}]")
@@ -398,7 +430,11 @@ def qc_source(ctx, params):
     times, imgs = FR.grab(src, fps=fps)
     if len(imgs) == 0:
         raise ops.OpError("抽帧失败")
-    probs, labels = C.similarity(C.encode_images(list(imgs)), _SPORT_PROMPTS)
+    try:
+        probs, labels = C.similarity(C.encode_images(list(imgs)), _SPORT_PROMPTS)
+    except RuntimeError as e:          # 没装 CLIP：跳过准入判断，不阻断整条流水线
+        ctx["precheck"] = {"verdict": "skipped", "reason": str(e)}
+        return {"verdict": "skipped", "reason": "未安装 CLIP，跳过素材准入"}
     idx = labels.index("sport")
     per_frame = probs[:, idx]
     mean_p = float(probs[:, idx].mean())
@@ -433,19 +469,29 @@ def select_semantic(ctx, params):
     # 先按运动/音量筛出一批候选，再用 CLIP 打分（省算力）
     # 候选全量打语义分（抽帧只做一次，CLIP 单帧 ~5ms，不必再截断）
     pool = cands
-    times, imgs = FR.grab(src, fps=float(params.get("fps", 2.0)))
-    if len(imgs) == 0:
-        raise ops.OpError("抽帧失败")
-    probs, labels = C.similarity(C.encode_images(list(imgs)), _SPORT_PROMPTS)
-    idx = labels.index("sport")
-    for c in pool:
-        inside = [i for i, t in enumerate(times) if c["start"] <= t < c["start"] + c["dur"]]
-        c["sem"] = float(probs[inside, idx].mean()) if inside else 0.0
-        c["score"] = round(0.6 * c["sem"] + 0.4 * c["action"], 4)
+    semantic = True
+    try:
+        times, imgs = FR.grab(src, fps=float(params.get("fps", 2.0)))
+        if len(imgs) == 0:
+            raise RuntimeError("抽帧失败")
+        probs, labels = C.similarity(C.encode_images(list(imgs)), _SPORT_PROMPTS)
+        idx = labels.index("sport")
+        for c in pool:
+            inside = [i for i, t in enumerate(times) if c["start"] <= t < c["start"] + c["dur"]]
+            c["sem"] = float(probs[inside, idx].mean()) if inside else 0.0
+            c["score"] = round(0.6 * c["sem"] + 0.4 * c["action"], 4)
+    except Exception:                     # 没装 CLIP / onnxruntime：退回纯规则
+        semantic = False
+        for c in pool:
+            c["sem"] = None
+            c["score"] = c["action"]
 
-    qualified = [p for p in pool if p["sem"] >= float(params.get("min_sem", 0.25))]
-    if not qualified:
-        raise ops.OpError(f"没有语义合格的镜头（最高 sem={max(p['sem'] for p in pool):.2f}）")
+    if semantic:
+        qualified = [p for p in pool if p["sem"] >= float(params.get("min_sem", 0.25))]
+        if not qualified:
+            raise ops.OpError(f"没有语义合格的镜头（最高 sem={max(p['sem'] for p in pool):.2f}）")
+    else:
+        qualified = pool
     chosen, used = ACT.pick_action(qualified, target, beat)
     total = sum(c["beats"] for c in chosen) * beat
     if total < float(params.get("min_total", 4.0)):
@@ -459,8 +505,9 @@ def select_semantic(ctx, params):
     ctx["edl"]["video"] = video
     ctx["edl"]["total"] = round(t, 3)
     return {"segments": len(video), "total": ctx["edl"]["total"],
-            "sem": round(float(sum(c["sem"] for c in chosen) / len(chosen)), 3),
-            "audit": [round(c["sem"], 2) for c in chosen]}
+            "semantic": semantic,
+            "sem": round(float(sum(c["sem"] for c in chosen) / len(chosen)), 3) if semantic else None,
+            "audit": [round(c["sem"], 2) for c in chosen] if semantic else None}
 
 
 def _card(ctx, text, dur, name, sub=""):

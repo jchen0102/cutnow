@@ -6,12 +6,19 @@ from . import ffmpeg as F
 
 # ---------- 音频 ----------
 
+class NoAudioError(RuntimeError):
+    """源文件没有音轨。"""
+
+
 def decode_audio(path: str, sr: int = 22050) -> np.ndarray:
     p = subprocess.run([F.ffmpeg(), "-hide_banner", "-nostdin", "-i", path,
                         "-f", "f32le", "-ac", "1", "-ar", str(sr), "-"],
                        capture_output=True)
     if p.returncode != 0:
-        raise RuntimeError(p.stderr.decode("utf-8", "ignore")[-800:])
+        msg = p.stderr.decode("utf-8", "ignore")
+        if "does not contain any stream" in msg or "Output file #0 does not contain" in msg:
+            raise NoAudioError(f"{path} 没有音轨")
+        raise RuntimeError(msg[-800:])
     return np.frombuffer(p.stdout, dtype=np.float32)
 
 

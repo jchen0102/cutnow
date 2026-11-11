@@ -9,8 +9,7 @@
     },
     "music": {
       "type": "audio",
-      "required": true,
-      "default": "assets/tos/battle.mp3"
+      "required": false
     }
   },
   "output": {
