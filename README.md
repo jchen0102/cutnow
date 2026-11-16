@@ -57,6 +57,37 @@ EDL    (out/edl_*.json)    the decision list: source in-point, duration, positio
 
 Three ideas, and that's the whole system: **solutions are data, ops are code, the EDL is the contract.**
 
+## Retention integrity, checkable
+
+Every run writes `out/<solution>.manifest.json`: a snapshot of what produced the file — engine /
+Python / ffmpeg / font identity, input hashes, EDL digest and the output `sha256`.
+
+```bash
+cutnow verify out/sports-highlight.manifest.json
+# 0 = 归档完整   2 = 环境漂移（文件仍一致）   3 = 输入 / EDL / 成片已变
+```
+
+**Scope, stated plainly:** `verify` answers *"is this archive still the run it claims to be, and
+has the toolchain drifted?"* It does **not** re-render, so it cannot prove that a fresh render would
+be byte-identical — that is a stronger and separate claim, tested separately.
+
+Paths are stored relative to the project root, so a run folder can be moved or archived and still
+be audited later.
+
+## Version → approval → delivery
+
+`cutnow run` also records a `version` (immutable EDL) and a `render_run` (environment, output sha,
+QC). Approval is explicit and **scoped**: approving an *output* binds to that exact render artifact,
+so an approval for v1 can never be reused for v2 — even when both renders are byte-identical.
+
+```bash
+cutnow approve <run_id> --by alice      # 审成片；--script 只审剪法
+cutnow deliver <run_id> --by bob        # 没有匹配的成片审批就拒绝
+cutnow audit <delivery_id>              # 版本 → 渲染 → 审批 → 交付 逐项核对
+```
+
+Schema, immutability rules and the incremental migration path: [docs/versions.md](docs/versions.md).
+
 ## Built-in solutions
 
 | Solution | Input | Output | Needs |
@@ -161,7 +192,8 @@ cutnow list                       # solutions and ops
 cutnow run <solution>             # --source, --music, --out, --yes, --json
 cutnow new <name>                 # scaffold a solution
 cutnow solution validate <path>
-cutnow serve [--port 8799]        # local timeline workbench
+cutnow serve [--port 8799]
+cutnow storyboard story.json --source clips/*.mp4 --out cut.mp4   # storyboard → film, no analysis        # local timeline workbench
 cutnow doctor
 ```
 

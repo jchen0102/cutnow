@@ -45,6 +45,23 @@ cutnow run talk   --source talk.mp4  --out out.mp4 --yes
 - 不给 `--out` 就用解法里的默认路径；
 - 失败时**不要猜**：把 stderr 原文贴给用户，或先跑 `cutnow doctor`。
 
+## 分镜直出（有稿子的情况）
+
+如果用户给的是分镜/脚本而不是素材，用这个，不要先跑分析：
+
+```bash
+cutnow storyboard 分镜.json --source 素材.mp4 --out 成片.mp4
+```
+
+分镜格式（media-desk 的六格分镜可以直接用）：
+
+```json
+{"shots": [{"no": 1, "shot": "中景", "voice": "口播文字", "seconds": 3}]}
+```
+
+- `seconds` 必填；`voice` 会切成字幕；没给 `--music` 就铺静音轨；
+- 素材可以有多个，按顺序轮转分配镜头。
+
 ## 读懂输出
 
 每一步会打印 `op 名称 / 耗时 / 返回摘要`。最关键的是最后两行：
@@ -55,7 +72,18 @@ cutnow run talk   --source talk.mp4  --out out.mp4 --yes
 ```
 
 - `pass: false` 时**不要交付**，把 `failed` 里的项告诉用户；
-- `sha256` 是复现凭据：同样的 EDL 应该得到同样的 sha。
+- `sha256` 是产物指纹：同一 EDL 在同一环境下应当得到同样的 sha；跨环境不保证。
+
+每次运行还会写 `out/<solution>.manifest.json`（引擎/ffmpeg/字体/输入/EDL/成片六类身份）。
+用户问"这份归档还能不能确认没被动过"时：
+
+```bash
+cutnow verify out/<solution>.manifest.json
+# 0 归档完整 / 2 环境漂移（文件仍一致）/ 3 输入、EDL 或成片已变
+```
+
+`verify` 只证明**留存文件与当时一致、工具链是否漂移**，不证明"重新渲染一定逐字节相同"。
+**不要**在 `broken` 时声称可复现；**不要**手工改 manifest 来"通过"校验。
 
 ## 加一个新解法
 

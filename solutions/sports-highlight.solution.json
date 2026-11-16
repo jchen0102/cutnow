@@ -1,7 +1,7 @@
 {
   "id": "sports-highlight",
   "name": "赛事集锦",
-  "description": "一段比赛素材 + 鼓点音乐 → 12 秒卡点集锦（自动选段）",
+  "description": "一段比赛素材 + 鼓点音乐 → 12 秒卡点集锦（自动选段；字幕/署名由 --credit 决定）",
   "inputs": {
     "source": {
       "type": "video",
@@ -58,11 +58,7 @@
       "id": "subs",
       "op": "subtitle.by_beat",
       "params": {
-        "beats_per_line": 6,
-        "lines": [
-          "SPORTS HIGHLIGHTS",
-          "Footage · Wikimedia CC BY-SA"
-        ]
+        "beats_per_line": 6
       }
     },
     {
@@ -83,9 +79,7 @@
     {
       "id": "render",
       "op": "render.edl",
-      "params": {
-        "out": "out/batch/00.mp4"
-      }
+      "params": {}
     },
     {
       "id": "qc",

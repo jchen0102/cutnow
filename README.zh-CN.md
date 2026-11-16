@@ -55,6 +55,33 @@ EDL             最终决策清单：每刀从原片哪一秒来、放哪、多�
 
 就这三样：**解法是数据，算子是代码，EDL 是契约。**
 
+## 留存完整性可校验
+
+每次运行都会写 `out/<解法>.manifest.json`：记录这份产物由什么产生——引擎 / Python / ffmpeg /
+字体身份、输入素材摘要、EDL 摘要、成片 `sha256`。
+
+```bash
+cutnow verify out/sports-highlight.manifest.json
+# 0 = 归档完整   2 = 环境漂移（文件仍一致）   3 = 输入 / EDL / 成片已变
+```
+
+**说清楚边界：** `verify` 回答的是"这份归档还是当时那次运行吗、工具链有没有漂移"，
+它**不**重新渲染，所以不能证明"现在重渲一定逐字节相同"——那是另一个更强的命题，需要单独验证。
+
+## 版本 → 审批 → 交付
+
+`cutnow run` 同时记录 `version`（不可变 EDL）和 `render_run`（环境、成片摘要、QC）。
+审批是显式且**分作用域**的：审成片会绑定到具体渲染产物，所以 v1 的审批不能用于 v2——
+即使两次渲染字节完全相同。
+
+```bash
+cutnow approve <run_id> --by alice      # 审成片；--script 只审剪法
+cutnow deliver <run_id> --by bob        # 没有匹配的成片审批就拒绝
+cutnow audit <delivery_id>              # 版本 → 渲染 → 审批 → 交付 逐项核对
+```
+
+schema、不可变规则与增量迁移：[docs/versions.md](docs/versions.md)。
+
 ## 内置解法
 
 | 解法 | 输入 | 产出 | 依赖 |
@@ -157,7 +184,8 @@ cutnow list                       # 列出解法与算子
 cutnow run <solution>             # --source / --music / --out / --yes / --json
 cutnow new <name>                 # 生成解法骨架
 cutnow solution validate <path>
-cutnow serve [--port 8799]        # 本地时间线工作台
+cutnow serve [--port 8799]
+cutnow storyboard 分镜.json --source 素材/*.mp4 --out 成片.mp4   # 分镜直出，不做分析        # 本地时间线工作台
 cutnow doctor
 ```
 

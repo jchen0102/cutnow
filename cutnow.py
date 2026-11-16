@@ -5,6 +5,7 @@ from core import analyze as A, plan as P, render as R
 from core import ffmpeg as F
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+_CALLER_CWD = os.getcwd()      # 记录要落在用户的项目目录，不是包安装目录
 
 def load(p): return json.load(open(p, encoding="utf-8"))
 def dump(o, p):
@@ -215,6 +216,55 @@ def cmd_demo(args):
     return rc
 
 
+def cmd_storyboard(args):
+    """分镜稿直出：storyboard.json + 素材 → EDL → 成片 → 质检 → 记录。"""
+    from core import builtin_ops  # noqa: F401  注册算子
+    from core import ffmpeg as F, storyboard as SB, ops
+    sources = []
+    for chunk in args.source or []:
+        sources += [c.strip() for c in chunk.split(",") if c.strip()]
+    if not sources:
+        raise SystemExit("需要 --source（可以给多个，用逗号分隔）")
+    sources = [os.path.abspath(x) for x in sources]
+    shots = SB.load(args.storyboard)
+    probe = F.probe(sources[0])
+    edl, warns = SB.build_edl(shots, sources, probe, title=args.title, end=args.end)
+    for w in warns:
+        print(f"  ! {w}")
+
+    root = HERE
+    os.chdir(root)
+    out = args.out or os.path.join(os.getcwd(), "storyboard.mp4")
+    # 音轨：给了音乐就用音乐，否则铺静音并说明
+    total = edl["total"]
+    if args.music:
+        music = os.path.abspath(args.music)
+        edl["assets"].append({"id": "music", "path": music})
+        print(f"  音轨：{os.path.basename(music)}")
+    else:
+        music = os.path.join(root, "out", "storyboard_silence.m4a")
+        os.makedirs(os.path.dirname(music), exist_ok=True)
+        F.run(["-y", "-f", "lavfi", "-i", "anullsrc=channel_layout=mono:sample_rate=48000",
+               "-t", f"{total:.3f}", "-c:a", "aac", music])
+        edl["assets"].append({"id": "music", "path": music})
+        print("  音轨：静音（没给 --music；分镜里的 voice 会变成字幕）")
+    edl["audio"] = [{"asset": "music", "in": 0.0, "dur": total, "gain_db": 0.0}]
+
+    ctx = {"root": root, "solution": {"id": "storyboard", "name": "分镜直出"},
+           "inputs": {"source": sources[0]}, "edl": edl, "log": [], "renders": [],
+           "analysis": {"probe": probe}}
+    print(f"分镜 {len(shots)} 个镜头 · {total:.1f}s → {out}")
+    rr = builtin_ops.render_edl(ctx, {"out": out})
+    ctx["log"].append({"id": "render", "op": "render.edl", "result": rr, "seconds": 0})
+    qq = builtin_ops.qc_report(ctx, {})
+    ctx["log"].append({"id": "qc", "op": "qc.report", "result": qq, "seconds": 0})
+    r = ctx["renders"][-1]
+    print(f"成片 {out}  {r['bytes']/1e6:.1f}MB  sha256={r['sha256']}")
+    if not getattr(args, "no_records", False):
+        _record_run(ctx["solution"], ctx)
+    return 0
+
+
 def cmd_serve(args):
     import subprocess
     script = os.path.join(HERE, "workbench", "server.py")
@@ -224,11 +274,36 @@ def cmd_serve(args):
     return subprocess.call([sys.executable, "-m", "workbench.server", str(args.port)])
 
 
+def _apply_text(args, sol):
+    """把 --title/--sub/--end/--end-sub/--credit 注入文字卡。
+
+    默认不出文字卡；用户给了才出。解法没有 card.bookends 时明确告知，而不是静默丢弃。
+    """
+    texts = {
+        "title": getattr(args, "title", None),
+        "sub": getattr(args, "sub", None),
+        "end": getattr(args, "end", None),
+        "end_sub": getattr(args, "end_sub", None),
+    }
+    credit = getattr(args, "credit", None)
+    if credit:
+        texts["end_sub"] = texts["end_sub"] or credit
+    texts = {k: v for k, v in texts.items() if v}
+    if not texts:
+        return
+    for st in sol["steps"]:
+        if st["op"] == "card.bookends":
+            st.setdefault("params", {}).update(texts)
+            return
+    print("提示：该解法没有文字卡步骤，--title/--credit 等已忽略", file=sys.stderr)
+
+
 def cmd_run_solution(args):
     from core import ops, builtin_ops  # noqa: F401
     from core import solution as SOL, runner
     path = _resolve_solution(args.solution)
     sol = SOL.load(path, ops.OPS)
+    _apply_text(args, sol)
     overrides = {}
     if args.source:
         overrides["source"] = os.path.abspath(args.source)
@@ -250,7 +325,178 @@ def cmd_run_solution(args):
         print(json.dumps({"solution": sol["id"], "steps": ctx["log"]}, ensure_ascii=False))
     for r in ctx.get("renders", []):
         print(f"成片 {r['file']}  {r['bytes']/1e6:.1f}MB  sha256={r['sha256']}")
+
+    if not getattr(args, "no_manifest", False):
+        mp = _write_manifest(sol, path, ctx, edl_path)
+    else:
+        mp = None
+    if not getattr(args, "no_records", False):
+        _record_run(sol, ctx, mp)
     return 0
+
+
+def _record_run(sol, ctx, manifest_path=None):
+    """把这次运行登记成 version + render_run；失败只警告，不影响出片。"""
+    record_root = _CALLER_CWD if os.path.isdir(_CALLER_CWD) else HERE
+    try:
+        from core import records as REC, manifest as MF
+        inputs = []
+        for key, raw in (ctx.get("inputs") or {}).items():
+            if not raw:
+                continue
+            path = raw if os.path.isabs(raw) else next(
+                (c for c in (os.path.join(os.getcwd(), raw), os.path.join(HERE, raw))
+                 if os.path.exists(c)), os.path.join(HERE, raw))
+            if os.path.exists(path):
+                ident = MF.identity(path, HERE)
+                inputs.append({"id": key, "path": ident["path"],
+                               "sha256": ident["sha256"], "bytes": ident["bytes"]})
+        parent = REC.latest_version_id(record_root, sol["id"])
+        ver = REC.create_version(record_root, ctx["edl"], inputs=inputs, solution_id=sol["id"],
+                                 parent_id=parent)
+        out = (ctx.get("renders") or [{}])[-1]
+        qc = next((s.get("result") for s in ctx.get("log") or [] if s.get("id") == "qc"), None)
+        env = MF.engine_identity()
+        env["ffmpeg"] = MF.ffmpeg_identity().get("version", "")
+        mref = None
+        if manifest_path and os.path.isfile(manifest_path):
+            mref = {"path": os.path.relpath(manifest_path, HERE),
+                    "sha256": MF.identity(manifest_path, HERE)["sha256"]}
+        run = REC.create_run(record_root, ver["id"],
+                             output={"path": out.get("file"), "sha256": out.get("sha256"),
+                                     "bytes": out.get("bytes")},
+                             qc=qc, manifest=mref, environment=env)
+        print(f"版本 {ver['id']} · 渲染 {run['id']}")
+        print(f"  审批成片：cutnow approve {run['id']} --by <你的名字>")
+    except Exception as e:
+        print(f"警告：记录版本失败：{e}", file=sys.stderr)
+
+
+def cmd_import(args):
+    """把旧产物登记为历史版本：缺失的环境/审批/来源一律标 unknown，不猜。"""
+    from core import records as REC
+    from core import manifest as MF
+    edl = json.load(open(args.edl, encoding="utf-8"))
+    unknown = args.unknown or ["environment", "approval", "source"]
+    ver = REC.create_version(HERE, edl, solution_id=args.solution or edl.get("id"),
+                             change_note=args.note or "历史导入", imported=True, unknown=unknown)
+    print(f"已导入版本 {ver['id']}（未知：{', '.join(ver['origin']['unknown'])}）")
+    if args.output:
+        ident = MF.identity(args.output, HERE, "full")
+        run = REC.create_run(record_root, ver["id"], status="succeeded",
+                             output={"path": ident["path"], "sha256": ident["sha256"],
+                                     "bytes": ident["bytes"]},
+                             environment={"unknown": True})
+        print(f"  关联历史成片：{run['id']}（执行环境未知）")
+    return 0
+
+
+def cmd_versions(args):
+    from core import records as REC
+    vers = REC.list_records(HERE, "version")
+    if args.json:
+        print(json.dumps(vers, ensure_ascii=False, indent=2))
+        return 0
+    if not vers:
+        print("还没有版本记录。跑一次 cutnow run 就会生成。")
+        return 0
+    runs = REC.list_records(HERE, "render_run")
+    print(f"{'版本':28} {'解法':18} {'父版本':28} 渲染  说明")
+    for v in vers:
+        n = sum(1 for r in runs if r.get("version_id") == v["id"])
+        print(f"{v['id']:28} {(v.get('solution_id') or '-'):18} "
+              f"{(v.get('parent_id') or '-'):28} {n:>4}  {v.get('change_note') or ''}")
+    return 0
+
+
+def cmd_approve(args):
+    from core import records as REC
+    decision = "rejected" if args.reject else "approved"
+    if args.script:
+        rec = REC.approve_script(HERE, args.target, by=args.by, note=args.note, decision=decision)
+    else:
+        rec = REC.approve_output(HERE, args.target, by=args.by, note=args.note, decision=decision)
+    what = "剪法（脚本）" if rec["scope"] == "script" else "成片"
+    print(f"已记录{what}审批：{rec['id']} · {rec['decision']} · by {rec['by']}")
+    if rec["scope"] == "output" and decision == "approved":
+        print(f"  下一步：cutnow deliver {args.target} --by <交付人>")
+    return 0
+
+
+def cmd_deliver(args):
+    from core import records as REC
+    try:
+        d = REC.deliver(HERE, args.run, by=args.by, channel=args.channel or "", note=args.note or "")
+    except REC.DeliveryRefused as e:
+        print(f"{e}", file=sys.stderr)
+        return 3
+    print(f"交付 {d['id']} · 版本 {d['version_id']} · 成片 {d['output_sha256'][:16]}…")
+    print(f"  审计：cutnow audit {d['id']}")
+    return 0
+
+
+def cmd_audit(args):
+    from core import records as REC
+    res = REC.audit(HERE, args.delivery)
+    if args.json:
+        print(json.dumps(res, ensure_ascii=False, indent=2))
+    else:
+        d = res.get("delivery") or {}
+        print(f"交付 {args.delivery} · 版本 {d.get('version_id', '?')} · 渲染 {d.get('run_id', '?')}")
+        for c in res.get("checks") or []:
+            mark = {"ok": "✓", "broken": "✗"}.get(c["status"], "?")
+            detail = f"  {c['detail']}" if c.get("detail") else ""
+            print(f"  {mark} {c['name']}{detail}")
+        print(f"\n结论：{'链路一致' if res['conclusion'] == 'ok' else '链路不一致'}")
+    return 0 if res["conclusion"] == "ok" else 3
+
+
+def _write_manifest(sol, solution_path, ctx, edl_path):
+    """跑完就把「这次为什么能复现」写成凭据，失败不影响出片。"""
+    try:
+        from core import manifest as MF
+        out = (ctx.get("renders") or [{}])[-1].get("path")
+        inputs = {}
+        for key, raw in (ctx.get("inputs") or {}).items():
+            if not raw:
+                continue
+            if os.path.isabs(raw):
+                inputs[key] = raw
+            else:
+                inputs[key] = next((c for c in (os.path.join(os.getcwd(), raw),
+                                                os.path.join(HERE, raw))
+                                    if os.path.exists(c)), os.path.join(HERE, raw))
+        mf = MF.build(solution_path, sol, inputs, ctx.get("log"), ctx["edl"],
+                      edl_path, out, HERE)
+        mp = os.path.join(HERE, "out", f"{sol['id']}.manifest.json")
+        MF.write(mf, mp)
+        print(f"凭据 {os.path.relpath(mp, HERE)}  （cutnow verify 可校验）")
+        return mp
+    except Exception as e:
+        print(f"警告：写复现凭据失败：{e}", file=sys.stderr)
+        return None
+
+
+def cmd_verify(args):
+    from core import manifest as MF
+    res = MF.verify(args.manifest)
+    if args.json:
+        print(json.dumps(res, ensure_ascii=False, indent=2))
+    else:
+        m = res["manifest"]
+        eng = m.get("engine") or {}
+        print(f"凭据 {args.manifest}")
+        print(f"  引擎   cutnow {eng.get('version')} · Python {eng.get('python')} · {eng.get('platform')}")
+        for c in res["checks"]:
+            mark = {"ok": "✓", "drift": "~", "broken": "✗"}.get(c["status"], "?")
+            detail = f"  {c['detail']}" if c.get("detail") else ""
+            print(f"  {mark} {c['name']}{detail}")
+        c = res["counts"]
+        verdict = {"ok": "可复现（产物与输入一致）",
+                   "drift": "环境漂移（产物仍一致，但重渲可能不再逐字节相同）",
+                   "broken": "承诺失效（输入 / EDL / 成片已变）"}[res["conclusion"]]
+        print(f"\n结论：{verdict}  ·  ok {c['ok']} / drift {c['drift']} / broken {c['broken']}")
+    return {"ok": 0, "drift": 2, "broken": 3}[res["conclusion"]]
 
 
 def cmd_doctor(args):
@@ -348,6 +594,16 @@ def _run():
     dm.add_argument("--out", default="cutnow-demo.mp4")
     dm.set_defaults(func=cmd_demo)
 
+    sb = sub.add_parser("storyboard", help="分镜稿直出成片（storyboard.json → mp4）")
+    sb.add_argument("storyboard", help="分镜 JSON")
+    sb.add_argument("--source", action="append", help="素材，可多个（逗号分隔或重复给）")
+    sb.add_argument("--music", help="配乐（不给就静音）")
+    sb.add_argument("--out", help="输出路径")
+    sb.add_argument("--title", help="片头标题")
+    sb.add_argument("--end", help="片尾文案")
+    sb.add_argument("--no-records", action="store_true", help="不登记版本/渲染记录")
+    sb.set_defaults(func=cmd_storyboard)
+
     sv = sub.add_parser("serve", help="启动本地工作台")
     sv.add_argument("--port", type=int, default=8799)
     sv.set_defaults(func=cmd_serve)
@@ -359,6 +615,13 @@ def _run():
     r.add_argument("--out", help="输出文件")
     r.add_argument("--yes", action="store_true", help="跳过人工闸门（复现用）")
     r.add_argument("--json", action="store_true", help="打印 JSON 结果（给脚本/agent 用）")
+    r.add_argument("--title", help="片头主标题（不给就不出文字卡）")
+    r.add_argument("--sub", help="片头副标题")
+    r.add_argument("--end", help="片尾主文案")
+    r.add_argument("--end-sub", dest="end_sub", help="片尾副文案")
+    r.add_argument("--credit", help="署名（等价于 --end-sub，写进片尾卡）")
+    r.add_argument("--no-manifest", action="store_true", help="不写复现凭据")
+    r.add_argument("--no-records", action="store_true", help="不登记版本/渲染记录")
     r.set_defaults(func=cmd_run_solution)
 
     rr = sub.add_parser("run-recipe", help="跑旧的 recipe 流水线")
@@ -379,6 +642,43 @@ def _run():
     sw.set_defaults(func=cmd_swap)
     doc = sub.add_parser("doctor", help="自检环境（ffmpeg / 模型 / 字体）")
     doc.set_defaults(func=cmd_doctor)
+
+    im = sub.add_parser("import", help="把旧 EDL/成片登记为历史版本（缺失信息标 unknown）")
+    im.add_argument("edl", help="EDL 路径")
+    im.add_argument("--solution", help="解法 id（默认取 EDL 的 id）")
+    im.add_argument("--output", help="已有成片路径（可选）")
+    im.add_argument("--note", default="", help="说明")
+    im.add_argument("--unknown", action="append", help="明确缺失的信息项")
+    im.set_defaults(func=cmd_import)
+
+    vs = sub.add_parser("versions", help="列出剪辑版本与渲染次数")
+    vs.add_argument("--json", action="store_true")
+    vs.set_defaults(func=cmd_versions)
+
+    apv = sub.add_parser("approve", help="审批：默认审成片（绑到具体渲染产物）")
+    apv.add_argument("target", help="渲染 id（默认）或版本 id（配 --script）")
+    apv.add_argument("--by", required=True, help="审批人")
+    apv.add_argument("--script", action="store_true", help="审批剪法（脚本），不绑定具体成片")
+    apv.add_argument("--reject", action="store_true", help="记录为驳回")
+    apv.add_argument("--note", default="", help="备注")
+    apv.set_defaults(func=cmd_approve)
+
+    dv = sub.add_parser("deliver", help="交付：必须有与该成片摘要匹配的成片审批")
+    dv.add_argument("run", help="渲染 id")
+    dv.add_argument("--by", required=True, help="交付人")
+    dv.add_argument("--channel", help="渠道，如 douyin / wechat")
+    dv.add_argument("--note", default="")
+    dv.set_defaults(func=cmd_deliver)
+
+    au = sub.add_parser("audit", help="审计一条交付：版本→渲染→审批 是否对得上")
+    au.add_argument("delivery")
+    au.add_argument("--json", action="store_true")
+    au.set_defaults(func=cmd_audit)
+
+    vf = sub.add_parser("verify", help="校验一份复现凭据（manifest）")
+    vf.add_argument("manifest", help="manifest 路径，如 out/sports-highlight.manifest.json")
+    vf.add_argument("--json", action="store_true", help="打印 JSON 结果")
+    vf.set_defaults(func=cmd_verify)
     so = sub.add_parser("solution", help="解法：列出 / 校验 / 执行")
     so.add_argument("action", choices=["list", "validate", "run"])
     so.add_argument("path", nargs="?")

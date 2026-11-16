@@ -28,12 +28,17 @@ def loudness(path):
             "true_peak_dbfs": float(tp[-1]) if tp else None}
 
 
-def sharpness(path, points=(0.2, 0.5, 0.8)):
-    """拉普拉斯方差（越大越清晰）；opencv 不可用就返回 None。"""
+def sharpness(path, points=None):
+    """拉普拉斯方差（越大越清晰）；多点取样取中位数，避免暗帧/空镜误判。
+
+    opencv 不可用就返回 None。
+    """
     try:
         import cv2
     except Exception:
         return None
+    if points is None:
+        points = tuple(round(0.1 + 0.8 * i / 6, 3) for i in range(7))
     total = duration(path)
     cap = cv2.VideoCapture(path)
     vals = []
@@ -45,7 +50,10 @@ def sharpness(path, points=(0.2, 0.5, 0.8)):
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         vals.append(round(float(cv2.Laplacian(gray, cv2.CV_64F).var()), 2))
     cap.release()
-    return round(sum(vals) / len(vals), 2) if vals else None
+    if not vals:
+        return None
+    vals.sort()
+    return round(vals[len(vals) // 2], 2)   # 中位数
 
 
 def subtitle_fit(edl):
@@ -73,7 +81,7 @@ def report(path, edl, thresholds=None, ignore=None, skip_subtitles=False):
         return cover / span >= 0.8
     blacks = [b for b in blacks if not _covered(b)]
     loud = loudness(path)
-    sharp = sharpness(path, points=(0.35, 0.5, 0.65))
+    sharp = sharpness(path)
     subs = subtitle_fit(edl)
     if skip_subtitles:
         subs = {"max_chars_per_line": subs["max_chars_per_line"], "longest_cue": subs["longest_cue"],

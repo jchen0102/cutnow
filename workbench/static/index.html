@@ -1,38 +1,46 @@
 <!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8">
-<title>cutnow 工作台</title>
+<title>cutnow</title>
 <link rel="stylesheet" href="/static/style.css">
 </head><body>
 <header>
-  <div class="brand">cutnow<span>工作台</span></div>
-  <div class="meta" id="meta"></div>
-  <div class="actions">
-    <button id="render" class="primary">渲染新版本</button>
-    <span id="job" class="job"></span>
+  <div class="brand">cutnow</div>
+  <div class="now" id="now">—</div>
+  <div class="acts">
+    <button id="reselect" class="ghost" title="按当前素材重新挑一遍镜头">重新生成</button>
+    <button id="render" class="primary">渲染</button>
+    <button id="export" class="ghost">导出</button>
+    <button id="historyBtn" class="ghost">历史</button>
   </div>
 </header>
+
 <main>
-  <section class="col shots">
-    <h2>镜头 <small id="shotCount"></small></h2>
-    <div id="shots" class="list"></div>
-    <h2>版本</h2>
-    <div id="versions" class="list versions"></div>
+  <section class="col left">
+    <h2>候选镜头 <small id="cnt"></small></h2>
+    <div id="clips" class="list"></div>
   </section>
 
   <section class="col center">
-    <h2>时间线 <small id="tlMeta"></small></h2>
-    <div class="tlwrap"><svg id="tl" preserveAspectRatio="none"></svg></div>
     <div class="playerwrap">
       <video id="player" controls playsinline preload="metadata"></video>
-      <div class="empty" id="empty">还没有版本，点右上角渲染</div>
+      <div class="empty" id="empty">还没有成片，点右上角「渲染」</div>
     </div>
+    <div id="strip" class="strip"></div>
+    <div id="qc" class="qcbar">渲染后这里显示质检</div>
   </section>
 
-  <section class="col ops">
-    <h2>决策</h2>
-    <div id="inspector" class="inspector hidden"></div>
-    <div id="ops" class="list opslist"></div>
+  <section class="col right">
+    <h2>改这一刀</h2>
+    <div id="inspector" class="inspector"><div class="dim">先在左边选一条</div></div>
+    <p class="tiny">应用只改草稿，不出片；要拿到新视频点右上角「渲染」。</p>
   </section>
 </main>
+
+<aside id="history" class="history hidden">
+  <div class="hhead"><b>历史 / 高级</b><button id="historyClose" class="ghost">关闭</button></div>
+  <div id="historyBody" class="hbody"></div>
+</aside>
+
+<div id="toast" class="toast"></div>
 <script src="/static/app.js"></script>
 </body></html>

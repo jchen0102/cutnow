@@ -1,7 +1,7 @@
 {
   "id": "film-montage",
   "name": "电影感卡点混剪",
-  "description": "CC BY 素材 + 鼓点音乐 → 15-20 秒横版卡点片（片尾带署名）",
+  "description": "一段长片 + 一首歌 → 15-20 秒横版卡点片（自动选段；文字卡由 --title/--credit 决定）",
   "inputs": {
     "source": {
       "type": "video",
@@ -30,56 +30,16 @@
     },
     {
       "id": "shots",
-      "op": "select.shots",
+      "op": "select.auto",
       "gate": "confirm",
       "params": {
-        "shots": [
-          [
-            425.7,
-            4
-          ],
-          [
-            40.35,
-            4
-          ],
-          [
-            441.51,
-            8
-          ],
-          [
-            95.62,
-            8
-          ],
-          [
-            491.88,
-            8
-          ],
-          [
-            383.23,
-            4
-          ],
-          [
-            470.54,
-            8
-          ],
-          [
-            57.17,
-            8
-          ]
-        ]
+        "target_seconds": 16
       }
     },
     {
       "id": "cards",
       "op": "card.bookends",
-      "params": {
-        "title": "TEARS OF STEEL",
-        "sub": "a Blender open movie",
-        "end": "CC BY 3.0",
-        "end_sub": "Blender Foundation",
-        "head_dur": 1.6,
-        "tail_dur": 2.2
-      }
+      "params": {}
     },
     {
       "id": "audio",
@@ -92,12 +52,7 @@
       "id": "cleanup",
       "op": "cleanup.crop",
       "params": {
-        "crop": [
-          1280,
-          534,
-          0,
-          0
-        ],
+        "crop": "full",
         "crop_bottom": 0
       }
     },
@@ -111,9 +66,7 @@
     {
       "id": "render",
       "op": "render.edl",
-      "params": {
-        "out": "out/tos-montage.mp4"
-      }
+      "params": {}
     },
     {
       "id": "qc",

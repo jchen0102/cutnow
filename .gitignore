@@ -12,6 +12,9 @@ private/
 *.onnx
 *.bin
 
+# 本地版本/审批记录（需要共享时单独导出）
+.cutnow/
+
 # Python
 __pycache__/
 *.pyc

@@ -19,7 +19,8 @@ def _txt(path, text):
     open(path, "w", encoding="utf-8").write(text)
     return path
 
-def build(edl, workdir, out_path, crf=20, preset="medium", threads=2, blur=18, replacements=None):
+def build(edl, workdir, out_path, crf=20, preset="medium", threads=2, blur=18, replacements=None,
+          loudnorm=None):
     os.makedirs(workdir, exist_ok=True)
     W, H, FPS = edl["output"]["width"], edl["output"]["height"], edl["output"]["fps"]
     cw, ch, cx, cy = edl["cleanup"]["crop"]
@@ -92,8 +93,9 @@ def build(edl, workdir, out_path, crf=20, preset="medium", threads=2, blur=18, r
 
     a = edl["audio"][0]
     fade = min(0.8, total / 8)
+    ln = f",loudnorm=I={loudnorm}:TP=-1.5:LRA=11" if loudnorm else ""
     parts.append(
-        f"[1:a]atrim=start={a['in']:.3f}:duration={total:.3f},asetpts=PTS-STARTPTS,"
+        f"[1:a]atrim=start={a['in']:.3f}:duration={total:.3f},asetpts=PTS-STARTPTS{ln},"
         f"afade=t=in:st=0:d={fade:.2f},afade=t=out:st={total-1.0:.3f}:d=1.0[aout]")
 
     graph = ";".join(parts)
