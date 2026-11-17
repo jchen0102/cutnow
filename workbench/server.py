@@ -28,6 +28,7 @@ REPL = os.path.join(ROOT, "out", "replacements.json")
 VERS = os.path.join(ROOT, "out", "versions.json")
 THUMBS = os.path.join(ROOT, "out", "thumbs")
 
+UPLOADS = os.path.join(ROOT, "out", "uploads")
 STATE = {"job": {"status": "idle", "log": "", "file": None, "started": None}}
 LOCK = threading.Lock()
 
@@ -185,6 +186,91 @@ def run_render(label=None):
         STATE["job"] = {"status": "error", "log": str(ex)[-600:], "file": None}
 
 
+def command(text, index=None):
+    """命令栏：只认几种确定性的改法，改完返回一句人话。"""
+    t = (text or "").strip()
+    if not t:
+        return {"ok": False, "message": "说点什么，比如「全长 15 秒」"}
+    e = edl()
+    video = e.get("video") or []
+    m = re.search(r"(全长|总长|总共|剪成|做成)\s*(\d+(?:\.\d+)?)\s*(秒|s|S)?", t)
+    if m:
+        target = float(m.group(2))
+        cur = float(e.get("total") or 0) or 1.0
+        if target <= 0 or not video:
+            return {"ok": False, "message": "目标时长不合理"}
+        scale = target / cur
+        for c in video:
+            c["beats"] = max(1, round(float(c.get("beats") or 1) * scale))
+        total = sum(float(c.get("beats") or 0) for c in video) * (60.0 / (bpm() or 120))
+        at = 0.0
+        for c in video:
+            c["dur"] = float(c["beats"]) * (60.0 / (bpm() or 120))
+            c["at"] = round(at, 3)
+            at += c["dur"]
+        e["total"] = round(total, 3)
+        _write_edl(e)
+        return {"ok": True, "message": f"改成 {e['total']:.1f}s（{len(video)} 刀）"}
+    m = re.search(r"(多|加|少|减)\s*(\d+)\s*拍", t)
+    if m and video:
+        i = int(index or 0)
+        if i >= len(video):
+            return {"ok": False, "message": "没有这个镜头"}
+        delta = int(m.group(2)) * (1 if m.group(1) in ("多", "加") else -1)
+        video[i]["beats"] = max(1, int(video[i].get("beats") or 8) + delta)
+        _reseq(e)
+        _write_edl(e)
+        return {"ok": True, "message": f"第 {i + 1} 刀现在是 {video[i]['beats']} 拍"}
+    if re.search(r"(重渲|重新渲染|再渲染|出片|渲染)", t):
+        with LOCK:
+            if STATE["job"]["status"] == "running":
+                return {"ok": False, "message": "已有渲染在跑"}
+            threading.Thread(target=run_render, args=(t[:12],), daemon=True).start()
+        return {"ok": True, "message": "开始渲染"}
+    return {"ok": False, "message": "没听懂：试试「全长 15 秒」「第 3 刀多 2 拍」「重渲」"}
+
+
+def _write_edl(e):
+    p = edl_path()
+    with open(p, "w", encoding="utf-8") as fh:
+        json.dump(e, fh, ensure_ascii=False, indent=2)
+
+
+def _reseq(e):
+    beat = 60.0 / (bpm() or 120)
+    at = 0.0
+    for c in e.get("video") or []:
+        c["dur"] = float(c.get("beats") or 1) * beat
+        c["at"] = round(at, 3)
+        at += c["dur"]
+    e["total"] = round(at, 3)
+
+
+def _job(cmd, label):
+    """跑一条 CLI（demo/open/storyboard），结果写到 STATE["job"]。"""
+    STATE["job"] = {"status": "running", "log": label, "file": None, "started": time.time()}
+    try:
+        proc = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)
+        tail = (proc.stdout or "")[-400:] + (proc.stderr or "")[-400:]
+        if proc.returncode != 0:
+            STATE["job"] = {"status": "error", "log": tail.strip()[-600:], "file": None}
+            return
+        STATE["job"] = {"status": "done", "log": label + " 完成", "file": None,
+                        "elapsed": round(time.time() - STATE["job"]["started"], 1)}
+    except Exception as ex:
+        STATE["job"] = {"status": "error", "log": str(ex)[-600:], "file": None}
+
+
+def _cli(*args):
+    return [sys.executable, os.path.join(ROOT, "cutnow.py"), *args]
+
+
+def _safe_name(name):
+    base = os.path.basename(name or "upload")
+    base = re.sub(r"[^\w.\-\u4e00-\u9fff]+", "_", base)[:120]
+    return base or "upload"
+
+
 def records_view():
     """审批台：每次渲染一行，回答「这版谁审的、能不能发」。"""
     vers = REC.list_records(ROOT, "version")
@@ -273,7 +359,14 @@ class Handler(BaseHTTPRequestHandler):
         if p == "/api/decisions":
             return self._send(200, decisions())
         if p == "/api/state":
-            return self._send(200, state())
+            try:
+                snap = state()
+                if not (snap.get("clips") or []):
+                    snap["empty"] = True       # 没有任何可剪的 EDL：走空态引导
+                return self._send(200, snap)
+            except Exception as ex:
+                return self._send(200, {"empty": True, "reason": str(ex)[:200],
+                                        "job": STATE["job"], "records": records_view()})
         if p == "/api/records":
             return self._send(200, records_view())
         if p == "/api/thumb":
@@ -310,6 +403,16 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         u = urlparse(self.path)
         n = int(self.headers.get("Content-Length") or 0)
+        if u.path == "/api/upload":
+            name = _safe_name((parse_qs(u.query).get("name") or ["upload.mp4"])[0])
+            os.makedirs(UPLOADS, exist_ok=True)
+            dst = os.path.join(UPLOADS, name)
+            raw = self.rfile.read(n) if n else b""
+            if not raw:
+                return self._send(400, {"error": "空文件"})
+            with open(dst, "wb") as fh:
+                fh.write(raw)
+            return self._send(200, {"path": dst, "bytes": len(raw), "name": name})
         body = json.loads(self.rfile.read(n) or b"{}")
         if u.path == "/api/clip":
             e = edl()
@@ -382,6 +485,40 @@ class Handler(BaseHTTPRequestHandler):
             except REC.DeliveryRefused as ex:
                 return self._send(409, {"error": str(ex)})
             return self._send(200, records_view())
+        if u.path == "/api/demo":
+            with LOCK:
+                if STATE["job"]["status"] == "running":
+                    return self._send(409, {"error": "已有任务在跑"})
+                threading.Thread(target=_job, args=(_cli("demo", "--out", "out/demo.mp4"), "生成演示片"), daemon=True).start()
+            return self._send(200, {"ok": True})
+        if u.path == "/api/open":
+            src = body.get("path")
+            if not src or not os.path.exists(src):
+                return self._send(400, {"error": "素材不存在"})
+            sol = body.get("solution") or "sports"
+            with LOCK:
+                if STATE["job"]["status"] == "running":
+                    return self._send(409, {"error": "已有任务在跑"})
+                threading.Thread(target=_job, args=(
+                    _cli("run", sol, "--source", src, "--out", "out/open.mp4", "--yes"),
+                    f"分析素材并出片（{sol}）"), daemon=True).start()
+            return self._send(200, {"ok": True})
+        if u.path == "/api/storyboard":
+            sb = body.get("path")
+            sources = body.get("sources") or []
+            if not sb or not os.path.exists(sb):
+                return self._send(400, {"error": "分镜文件不存在"})
+            if not sources:
+                return self._send(400, {"error": "分镜需要至少一个素材"})
+            with LOCK:
+                if STATE["job"]["status"] == "running":
+                    return self._send(409, {"error": "已有任务在跑"})
+                threading.Thread(target=_job, args=(
+                    _cli("storyboard", sb, "--source", ",".join(sources),
+                         "--out", "out/storyboard.mp4"), "按分镜出片"), daemon=True).start()
+            return self._send(200, {"ok": True})
+        if u.path == "/api/command":
+            return self._send(200, command(body.get("text") or "", body.get("index")))
         if u.path == "/api/render":
             with LOCK:
                 if STATE["job"]["status"] == "running":
